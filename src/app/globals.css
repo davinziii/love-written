@@ -1,0 +1,310 @@
+@import "tailwindcss";
+
+/* Love, Written brand tokens */
+@theme {
+  --color-cream: #fbf6f1;
+  --color-paper: #fffdfa;
+  --color-ink: #2b1d22;
+  --color-ink-soft: #6f5960;
+  --color-rose: #c4486a;
+  --color-rose-deep: #9e2f50;
+  --color-blush: #f6d5dc;
+  --color-petal: #fbe9ec;
+  --color-line: #eadcd8;
+  --color-success: #2f7a4f;
+  --color-danger: #b3261e;
+
+  /* Admin dashboard surfaces */
+  --color-canvas: #f3f1f0;
+  --color-soft: #f8f9fa;
+  --color-chart-a: #c4486a;
+  --color-chart-b: #3f6fb5;
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-script: var(--font-dancing), cursive;
+
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-blush);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-rose);
+  outline-offset: 2px;
+}
+
+/* ─── Motion primitives ───────────────────────────────────────────────────────
+   Only transform / opacity / clip-path are animated (GPU-friendly).
+   Everything is disabled under prefers-reduced-motion at the bottom of this file. */
+
+@keyframes lw-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+.animate-fade-up {
+  animation: lw-fade-up 0.8s var(--ease-out-soft) both;
+}
+
+@keyframes lw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Scroll reveal: <Reveal> sets data-visible when the element enters the viewport. */
+.lw-reveal {
+  opacity: 0;
+  transform: translateY(22px) scale(0.985);
+  transition:
+    opacity 0.8s var(--ease-out-soft),
+    transform 0.8s var(--ease-out-soft);
+  transition-delay: var(--d, 0ms);
+}
+.lw-reveal[data-visible="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Hero headline: words rise in one after another. */
+@keyframes lw-word-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.45em) rotate(2deg);
+    filter: blur(6px);
+  }
+}
+.lw-word {
+  display: inline-block;
+  animation: lw-word-in 0.9s var(--ease-out-soft) both;
+  animation-delay: calc(var(--i, 0) * 90ms + 150ms);
+}
+
+/* Typing line with a blinking caret (clip-path keeps layout stable). */
+@keyframes lw-type {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes lw-caret {
+  50% {
+    opacity: 0;
+  }
+}
+.lw-typing {
+  display: inline-block;
+  animation: lw-type 1.8s steps(var(--steps, 28)) both;
+  animation-delay: var(--d, 1.2s);
+}
+.lw-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: -0.12em;
+  background: currentColor;
+  animation: lw-caret 1s step-end infinite;
+}
+
+/* Handwritten underline that draws itself. */
+@keyframes lw-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.lw-draw path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: lw-draw 1.2s var(--ease-out-soft) forwards;
+  animation-delay: var(--d, 1s);
+}
+
+/* Slow background blobs. */
+@keyframes lw-blob {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(6%, -4%, 0) scale(1.08);
+  }
+  66% {
+    transform: translate3d(-5%, 5%, 0) scale(0.95);
+  }
+}
+.lw-blob {
+  animation: lw-blob var(--t, 26s) ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Sparse floating hearts. */
+@keyframes lw-float-up {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(-8deg) scale(0.7);
+    opacity: 0;
+  }
+  15% {
+    opacity: var(--o, 0.55);
+  }
+  85% {
+    opacity: var(--o, 0.55);
+  }
+  100% {
+    transform: translate3d(var(--x, 0px), -70vh, 0) rotate(12deg) scale(1);
+    opacity: 0;
+  }
+}
+.lw-float {
+  animation: lw-float-up var(--t, 14s) linear infinite;
+  animation-delay: var(--d, 0s);
+}
+
+/* Gentle bob for decorative icons. */
+@keyframes lw-bob {
+  50% {
+    transform: translateY(-6px) rotate(var(--r, 0deg));
+  }
+}
+.lw-bob {
+  animation: lw-bob var(--t, 5s) ease-in-out infinite;
+}
+
+/* Twinkle for sparkles. */
+@keyframes lw-twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.lw-twinkle {
+  animation: lw-twinkle var(--t, 3.2s) ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+
+/* Heart burst particles (button clicks, celebrations). */
+@keyframes lw-burst {
+  0% {
+    transform: translate(-50%, -50%) scale(0.4);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1);
+    opacity: 0;
+  }
+}
+.lw-burst {
+  position: fixed;
+  pointer-events: none;
+  z-index: 60;
+  color: var(--color-rose);
+  animation: lw-burst var(--t, 0.75s) var(--ease-out-soft) forwards;
+}
+
+/* Pop-in for badges / success marks. */
+@keyframes lw-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.08);
+  }
+}
+.lw-pop {
+  animation: lw-pop 0.5s var(--ease-out-soft) both;
+}
+
+/* Shared press feedback for buttons and links styled as buttons. */
+.lw-press {
+  transition:
+    transform 0.2s var(--ease-out-soft),
+    box-shadow 0.2s var(--ease-out-soft),
+    background-color 0.2s;
+}
+.lw-press:hover {
+  transform: translateY(-1px);
+}
+.lw-press:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Lift for cards. */
+.lw-lift {
+  transition:
+    transform 0.35s var(--ease-out-soft),
+    box-shadow 0.35s var(--ease-out-soft);
+}
+.lw-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 48px -24px rgb(43 29 34 / 0.28);
+}
+
+/* Off-screen animated regions pause (see <PauseOffscreen>). */
+[data-offscreen="true"],
+[data-offscreen="true"] * {
+  animation-play-state: paused !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-fade-up,
+  .lw-word,
+  .lw-typing,
+  .lw-blob,
+  .lw-bob,
+  .lw-twinkle,
+  .lw-pop {
+    animation: none !important;
+  }
+  .lw-draw path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .lw-caret,
+  .lw-float,
+  .lw-burst {
+    display: none !important;
+  }
+  .lw-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .lw-press,
+  .lw-lift {
+    transition: none;
+  }
+  .lw-press:hover,
+  .lw-lift:hover {
+    transform: none;
+  }
+}
