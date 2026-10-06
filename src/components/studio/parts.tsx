@@ -231,12 +231,39 @@ export function RecoveryCodeCard({ code }: { code?: string }) {
   return (
     <div className="rounded-[1.5rem] bg-paper p-5 ring-1 ring-line">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose">Your recovery code</p>
-      <p className="mt-2 font-mono text-2xl tracking-[0.15em]">{code}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <p className="font-mono text-2xl tracking-[0.15em]">{code}</p>
+        <CopyButton value={code} label="Copy recovery code" />
+      </div>
       <p className="mt-2 text-sm text-ink-soft">
         Save this. It lets you find this surprise on another device or if your browser data is cleared — no account
         needed.
       </p>
     </div>
+  );
+}
+
+/** Small copy-to-clipboard button with a brief "Copied" confirmation. */
+export function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1800);
+        } catch {
+          // clipboard blocked — the code is still selectable text
+        }
+      }}
+      className="lw-press inline-flex items-center gap-1.5 rounded-full bg-petal px-3 py-1.5 text-xs font-medium text-rose-deep ring-1 ring-blush hover:bg-blush"
+    >
+      {copied ? <Icon.check size={13} strokeWidth={2.6} /> : <Icon.copy size={13} />}
+      {copied ? "Copied" : "Copy"}
+    </button>
   );
 }
 

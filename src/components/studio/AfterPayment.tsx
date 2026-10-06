@@ -8,6 +8,7 @@ import { HOSTING_DAYS, validateScheduleTime } from "@/lib/lifecycle";
 import { CopyLink, ConfirmDialog, formatReveal, LivePreview, Notice, RecoveryCodeCard, RevealTiming } from "./parts";
 import { usePublish } from "./usePublish";
 import { Celebrate } from "@/components/motion/Motion";
+import { HeartQrCard } from "./HeartQrCard";
 import type { Reveal, Studio } from "./useStudio";
 
 /* ─── Waiting for the PayMongo webhook ─────────────────────────────────────── */
@@ -327,6 +328,7 @@ export function ScheduledPanel({ studio, onEdit }: { studio: Studio; onEdit: () 
           )}
           {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
         </div>
+        {state.publicUrl && <HeartQrCard url={state.publicUrl} />}
         <RecoveryCodeCard code={studio.recoveryCode} />
       </section>
       <aside className="lg:sticky lg:top-24 lg:self-start">
@@ -388,13 +390,16 @@ export function LivePanel({ studio }: { studio: Studio }) {
               <dd className="mt-1 font-medium">{formatReveal(state.expiresAt)}</dd>
             </div>
           </dl>
-          <Notice tone="info">
-            <span className="text-sm">
-              Your surprise is now locked and can&rsquo;t be edited. After {HOSTING_DAYS} days its photos and messages are
-              deleted — save anything you&rsquo;d like to keep.
-            </span>
-          </Notice>
+          <div className="mt-6">
+            <Notice tone="info">
+              <span className="text-sm">
+                Your surprise is now locked and can&rsquo;t be edited. After {HOSTING_DAYS} days its photos and messages are
+                deleted — save anything you&rsquo;d like to keep.
+              </span>
+            </Notice>
+          </div>
         </div>
+        {state.publicUrl && <HeartQrCard url={state.publicUrl} />}
         <RecoveryCodeCard code={studio.recoveryCode} />
       </section>
       <aside className="lg:sticky lg:top-24 lg:self-start">
