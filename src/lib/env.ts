@@ -39,6 +39,40 @@ export function env(): ServerEnv {
   return cached;
 }
 
+/**
+ * Names of environment variables that are missing or invalid (never their values).
+ * Used to show the site owner a clear setup message instead of a crash.
+ */
+export function envProblems(): string[] {
+  const parsed = schema.safeParse(process.env);
+  if (parsed.success) return [];
+  return parsed.error.issues.map((i) => {
+    const name = i.path.join(".");
+    if (name === "NEXT_PUBLIC_SITE_URL" || name.endsWith("_URL")) return `${name} (must be a full address starting with https://)`;
+    if (name === "APP_HASH_PEPPER") return `${name} (at least 24 characters)`;
+    if (name === "CRON_SECRET") return `${name} (at least 16 characters)`;
+    return name;
+  });
+}
+
+/** A safe, actionable explanation of a server setup failure for the admin. */
+export function describeSetupError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  if (message.startsWith("Missing or invalid environment variables")) {
+    return `Server setup is incomplete. Check these environment variables: ${envProblems().join(", ")}. After changing them on Vercel, redeploy.`;
+  }
+  if (/rate_limit_hit|admin_users|relation .* does not exist|Could not find the (function|table)/i.test(message)) {
+    return "The database isn't fully set up. Run supabase/migrations/0001_init.sql (and 0002) in the Supabase SQL Editor.";
+  }
+  if (/Invalid API key|JWT|apikey/i.test(message)) {
+    return "Supabase rejected the API keys. Check NEXT_PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY match your project, then redeploy.";
+  }
+  if (/fetch failed|ENOTFOUND|getaddrinfo/i.test(message)) {
+    return "The server couldn't reach Supabase. Check NEXT_PUBLIC_SUPABASE_URL is your project's URL (https://xxxx.supabase.co).";
+  }
+  return "Sign-in failed because of a server error. Check Vercel → your project → Logs for “admin_login_error”.";
+}
+
 /** PayMongo credentials, checked only when a payment feature is actually used. */
 export function paymongoSecrets(): { secretKey: string; webhookSecret: string } {
   const { PAYMONGO_SECRET_KEY: secretKey, PAYMONGO_WEBHOOK_SECRET: webhookSecret } = env();
