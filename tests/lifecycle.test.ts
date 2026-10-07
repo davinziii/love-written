@@ -6,6 +6,7 @@ import {
   expiryFrom,
   studioScreen,
   validateScheduleTime,
+  UNPUBLISHED_PAID_TTL_DAYS,
   viewerAccess,
   STAGES,
   type Stage,
@@ -68,6 +69,12 @@ describe("recipient access", () => {
   it("disabled and deleted are not viewable", () => {
     expect(viewerAccess(row("DISABLED"), now).kind).toBe("unavailable");
     expect(viewerAccess(row("DELETED"), now).kind).toBe("ended");
+  });
+});
+
+describe("60-day rule for unpublished paid surprises", () => {
+  it("is 60 days", () => {
+    expect(UNPUBLISHED_PAID_TTL_DAYS).toBe(60);
   });
 });
 

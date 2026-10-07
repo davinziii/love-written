@@ -5,6 +5,7 @@ import { log, errorMessage } from "@/lib/log";
 import { track } from "@/lib/analytics/server";
 import { UNIQUE_VIOLATION, type OrderRow } from "@/lib/db-types";
 import { verifyPaymongoSignature } from "./signature";
+import { alert } from "@/lib/alerts";
 
 /**
  * PayMongo webhook processing — the ONLY place an order becomes PAID.
@@ -112,6 +113,7 @@ export async function handlePaymongoWebhook(rawBody: string, signatureHeader: st
   } catch (err) {
     const message = errorMessage(err);
     log.error("webhook_processing_failed", { eventId, type, error: message });
+    alert("webhook_failed", { "Event": eventId, "Type": type });
     await db().from("payment_events").update({ error: message }).eq("provider_event_id", eventId);
     return { status: 500, body: { error: "retry" } }; // PayMongo will retry
   }
@@ -215,6 +217,7 @@ async function markPaid(order: OrderRow, payment: PaymentInfo, sessionId: string
       // Another order for this surprise is already paid: a genuine double payment.
       // Recorded in `payments` for the admin to handle; never auto-refunded.
       log.error("duplicate_payment_detected", { orderId: order.id, surpriseId: order.surprise_id, paymentId: payment.id });
+      alert("duplicate_payment", { "Order": order.order_number, "PayMongo payment": payment.id });
       return;
     }
     throw new Error(`mark order paid: ${orderError.message}`);

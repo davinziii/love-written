@@ -41,8 +41,10 @@ export default async function TemplatePage({ params }: Props) {
     <>
       <TrackView event="template_selected" templateId={template.id} />
       <SiteHeader />
-      <main className="relative isolate mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
+      {/* Full-width background: the blobs span the whole page, not just the content box. */}
+      <div className="relative isolate overflow-x-clip">
         <GradientBlobs variant="soft" />
+        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
         <ResumeDraftBanner templateId={template.id} />
         <nav className="mb-6 text-sm">
           <Link href="/surprises" className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-ink-soft transition hover:bg-white/70 hover:text-ink">
@@ -120,7 +122,8 @@ export default async function TemplatePage({ params }: Props) {
             </Reveal>
           </aside>
         </div>
-      </main>
+        </main>
+      </div>
       <SiteFooter />
     </>
   );

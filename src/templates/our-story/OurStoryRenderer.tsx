@@ -23,7 +23,8 @@ export function OurStoryRenderer({ data, mode }: RendererProps<OurStoryData>) {
   const [opened, setOpened] = useState(false);
   const introRef = useRef<HTMLElement>(null);
   const theme = getTheme(data.theme);
-  const font = getFont(data.font);
+  const storyFont = getFont(data.story_font, "lora");
+  const finalFont = getFont(data.final_font, "great_vibes");
   const track = getTrack(data.music);
 
   const memories = [
@@ -47,7 +48,7 @@ export function OurStoryRenderer({ data, mode }: RendererProps<OurStoryData>) {
   }
 
   return (
-    <div className={s.root} style={themeVars(theme, font) as CSSProperties}>
+    <div className={s.root} style={themeVars(theme, storyFont, finalFont) as CSSProperties}>
       <Cover name={data.recipient_name} opened={opened} onOpen={open} />
 
       {opened && (

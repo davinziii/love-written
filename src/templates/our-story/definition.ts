@@ -1,5 +1,5 @@
 import { defineTemplate, type TemplateData } from "../types";
-import { MUSIC_LIBRARY } from "../styles";
+import { FINAL_FONT_IDS, MUSIC_LIBRARY, STORY_FONT_IDS } from "../styles";
 
 /**
  * Our Story — the field schema.
@@ -15,14 +15,14 @@ export const ourStoryDefinition = defineTemplate({
   description:
     "A romantic, interactive story built from your photos and words. They open it like a letter, scroll through the moments that made you two, and end on a final reveal written just for them.",
   category: "Romance · Anniversary · Just Because",
-  schemaVersion: 1,
+  schemaVersion: 2,
   listed: true,
   displayField: "recipient_name",
   highlights: [
     "Opens like a sealed letter",
     "Up to three photo memories",
     "A final message they reveal with a tap",
-    "Five color themes and five type styles",
+    "Ten color themes, plus fonts for your story and final message",
   ],
   fields: [
     // ── The Opening ────────────────────────────────────────────────
@@ -149,6 +149,16 @@ export const ourStoryDefinition = defineTemplate({
       rows: 5,
       placeholder: "Out of everyone in the world, I'd still choose you…",
     },
+    {
+      id: "final_font",
+      type: "font",
+      label: "Final message font",
+      group: "The Final Reveal",
+      help: "Only the final message and your signature use this font.",
+      options: FINAL_FONT_IDS,
+      default: "great_vibes",
+      previewText: "I love you",
+    },
 
     // ── Look & Feel (style) ────────────────────────────────────────
     {
@@ -156,16 +166,18 @@ export const ourStoryDefinition = defineTemplate({
       type: "color",
       label: "Color theme",
       group: "Look & Feel",
-      options: ["blush", "midnight", "sunset", "sage", "lavender"],
+      options: ["blush", "midnight", "sunset", "sage", "lavender", "ocean", "cherry", "champagne", "latte", "noir"],
       default: "blush",
     },
     {
-      id: "font",
+      id: "story_font",
       type: "font",
-      label: "Type style",
+      label: "Story font",
       group: "Look & Feel",
-      options: ["classic", "romantic", "handwritten", "modern", "gentle"],
-      default: "classic",
+      help: "Used for the titles and every memory.",
+      options: STORY_FONT_IDS,
+      default: "lora",
+      previewText: "Our Story",
     },
     {
       id: "music",
@@ -195,7 +207,8 @@ export const ourStoryDefinition = defineTemplate({
     final_message:
       "Out of everyone in the world, I'd still choose you — every single time. Happy anniversary, my love.",
     theme: "blush",
-    font: "classic",
+    story_font: "lora",
+    final_font: "great_vibes",
     music: "none",
   },
 });

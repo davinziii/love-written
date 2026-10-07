@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { createManualOrderAction, type IssueResult } from "@/app/admin/(dash)/actions";
 import { IssuedAccessCard } from "./IssuedAccessCard";
@@ -18,6 +18,7 @@ export function ManualOrderForm({
   idempotencyKey: string;
 }) {
   const [state, action, pending] = useActionState<IssueResult | null, FormData>(createManualOrderAction, null);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
   if (state?.ok && state.access) {
     return (
@@ -77,13 +78,29 @@ export function ManualOrderForm({
       </label>
 
       <label className="flex items-start gap-3 rounded-2xl bg-[#fff4e0] px-4 py-3 text-sm">
-        <input type="checkbox" name="confirmPaid" value="yes" required className="mt-0.5 accent-[var(--color-rose)]" />
+        <input
+          type="checkbox"
+          name="confirmPaid"
+          value="yes"
+          required
+          checked={paymentConfirmed}
+          onChange={(e) => setPaymentConfirmed(e.target.checked)}
+          className="mt-0.5 accent-[var(--color-rose)]"
+        />
         <span>I have checked my GCash / Maya / bank app and the payment was received.</span>
       </label>
 
-      <Button type="submit" busy={pending} busyLabel="Creating…" className="w-full sm:w-auto">
+      <Button
+        type="submit"
+        busy={pending}
+        busyLabel="Creating…"
+        disabled={!paymentConfirmed}
+        title={paymentConfirmed ? undefined : "Confirm you received the payment first"}
+        className="w-full sm:w-auto"
+      >
         Create surprise &amp; private link
       </Button>
+      {!paymentConfirmed && <p className="text-xs text-ink-soft">Tick the payment box above to continue.</p>}
       {state && !state.ok && (
         <p role="alert" className="text-sm text-danger">
           {state.message}

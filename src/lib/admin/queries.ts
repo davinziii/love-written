@@ -144,7 +144,7 @@ export async function surpriseDetail(id: string) {
   const { data, error } = await db()
     .from("surprises")
     .select(
-      `${SURPRISE_COLUMNS}, schema_version, content, style, locked_at, draft_expires_at, deleted_at, disabled_at,
+      `${SURPRISE_COLUMNS}, schema_version, content, style, locked_at, draft_expires_at, deleted_at, disabled_at, last_customer_activity_at,
        orders(*, payments(*)), publish_operations(*), reports(*), cleanup_jobs(*), media(*)`,
     )
     .eq("id", id)
@@ -152,7 +152,10 @@ export async function surpriseDetail(id: string) {
   if (error) throw new Error(error.message);
   if (!data) return null;
   return data as unknown as AdminSurprise &
-    Pick<SurpriseRow, "schema_version" | "content" | "style" | "locked_at" | "draft_expires_at" | "deleted_at" | "disabled_at"> & {
+    Pick<
+      SurpriseRow,
+      "schema_version" | "content" | "style" | "locked_at" | "draft_expires_at" | "deleted_at" | "disabled_at" | "last_customer_activity_at"
+    > & {
       publish_operations: PublishOperationRow[];
       reports: ReportRow[];
       cleanup_jobs: CleanupJobRow[] | CleanupJobRow | null;

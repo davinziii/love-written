@@ -18,8 +18,10 @@ export function IssuedAccessCard({ access }: { access: IssuedAccess }) {
     "",
     `Your recovery code (keep it safe): ${access.recoveryCode}`,
     "",
-    "Open the link on the phone or laptop you'll use. You can edit until you publish — once it's live it's locked, and it stays online for 30 days.",
-    "Please don't share this link with the person you're surprising. 🤫",
+    "📱 For best results, tap ⋯ → Open in browser.",
+    "🤫 Don't forward this message to them.",
+    "",
+    "You can edit until you publish — once it's live it's locked, and it stays online for 30 days. If you don't open your link for 60 days before publishing, the surprise is deleted.",
   ].join("\n");
 
   return (

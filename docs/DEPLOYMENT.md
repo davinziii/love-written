@@ -21,7 +21,8 @@ Supabase                PayMongo
 2. **SQL Editor** → run `supabase/migrations/0001_init.sql`. It creates the tables, enables
    RLS on every table (with no public policies), the private `surprise-media` bucket,
    the immutability triggers and helper functions.
-   Then run `supabase/migrations/0002_manual_payments.sql` (manual payment workflow).
+   Then run `supabase/migrations/0002_manual_payments.sql` (manual payment workflow) and
+   `supabase/migrations/0003_activity_and_content_reports.sql` (60-day rule + abuse reports).
 3. **Settings → API**: copy the URL, `anon` key and `service_role` key into Vercel env vars.
    The service role key is server-only — never prefix it with `NEXT_PUBLIC_`.
 4. **Create the admin:**
@@ -100,6 +101,18 @@ select cron.schedule(
      ); $$
 );
 ```
+
+## 3b. Email alerts (Resend, free)
+
+You get an email when a paid surprise fails to publish, a customer or recipient files a report,
+a deletion needs a retry, a payment webhook fails, or the site hits a server error.
+
+1. Sign up at **resend.com** using **lovewritten.business@gmail.com** (the alert address).
+   Without your own domain, Resend only delivers to the address you signed up with.
+2. Resend → **API Keys** → create a key → add it on Vercel as `RESEND_API_KEY`.
+3. Optional: `ALERT_EMAIL` (defaults to lovewritten.business@gmail.com) and `ALERT_FROM`.
+4. Redeploy. Alerts are limited to a few per type per hour so the inbox never floods.
+   They never contain customer messages, photos or links.
 
 ## 4. Cloudflare
 

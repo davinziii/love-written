@@ -5,13 +5,14 @@
   position: relative;
   background: var(--lw-bg);
   color: var(--lw-ink);
-  font-family: var(--font-inter), system-ui, sans-serif;
+  /* Story font: every title and memory. The final message has its own font (--lw-final). */
+  font-family: var(--lw-story), Georgia, serif;
   container-type: inline-size;
   overflow-x: clip;
 }
 
 .heading {
-  font-family: var(--lw-heading), Georgia, serif;
+  font-family: var(--lw-story), Georgia, serif;
   font-weight: 500;
   letter-spacing: -0.01em;
 }
@@ -129,7 +130,7 @@
 }
 
 .prose {
-  font-size: 1.08rem;
+  font-size: calc(1.08rem * var(--lw-story-scale, 1));
   line-height: 1.75;
   white-space: pre-line;
   overflow-wrap: anywhere;
@@ -193,8 +194,8 @@
   margin-top: 0.7rem;
   text-align: center;
   color: var(--lw-muted);
-  font-family: var(--font-dancing), cursive;
-  font-size: 1.25rem;
+  font-style: italic;
+  font-size: calc(1.05rem * var(--lw-story-scale, 1));
 }
 
 .memoryText {
@@ -241,8 +242,10 @@
 .heartButton:focus-visible { outline: 3px solid var(--lw-ink); outline-offset: 4px; }
 
 .finalMessage {
-  font-size: clamp(1.6rem, 7cqi, 2.6rem);
-  line-height: 1.3;
+  font-family: var(--lw-final), cursive;
+  font-style: var(--lw-final-style, normal);
+  font-size: calc(clamp(1.6rem, 7cqi, 2.6rem) * var(--lw-final-scale, 1));
+  line-height: 1.35;
   white-space: pre-line;
   overflow-wrap: anywhere;
   max-width: 30rem;
@@ -255,8 +258,9 @@
 }
 
 .signatureName {
-  font-family: var(--font-dancing), cursive;
-  font-size: 2rem;
+  font-family: var(--lw-final), cursive;
+  font-style: var(--lw-final-style, normal);
+  font-size: calc(2rem * var(--lw-final-scale, 1));
   color: var(--lw-accent);
 }
 
@@ -327,8 +331,8 @@
   .chapterSplit .memoryText { margin-top: 0; text-align: left; font-size: 1.2rem; }
   .chapterSplit .polaroid { width: min(100%, 26rem); }
 
-  .finalMessage { font-size: clamp(2.4rem, 4.2cqi, 3.6rem); max-width: 46rem; }
-  .signatureName { font-size: 2.6rem; }
+  .finalMessage { font-size: calc(clamp(2.4rem, 4.2cqi, 3.6rem) * var(--lw-final-scale, 1)); max-width: 46rem; }
+  .signatureName { font-size: calc(2.6rem * var(--lw-final-scale, 1)); }
 }
 
 /* ── Scroll reveal ─────────────────────────────────── */

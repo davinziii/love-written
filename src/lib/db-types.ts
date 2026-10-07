@@ -24,6 +24,8 @@ export interface SurpriseRow {
   deleted_at: string | null;
   first_opened_at: string | null;
   open_count: number;
+  /** Last time the customer opened/edited it with their private credential (not admin views). */
+  last_customer_activity_at: string;
   created_at: string;
   updated_at: string;
 }
@@ -109,6 +111,8 @@ export interface ReportRow {
   error_message: string | null;
   customer_message: string | null;
   status: "OPEN" | "RESOLVED";
+  kind: "publish_failed" | "content";
+  reason: string | null;
   created_at: string;
   resolved_at: string | null;
 }
@@ -116,7 +120,7 @@ export interface ReportRow {
 export interface CleanupJobRow {
   id: string;
   surprise_id: string;
-  reason: "expired" | "abandoned_draft" | "admin";
+  reason: "expired" | "abandoned_draft" | "admin" | "unpublished_paid";
   status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
   attempts: number;
   last_attempt_at: string | null;

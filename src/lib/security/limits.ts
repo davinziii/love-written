@@ -16,6 +16,9 @@ export const LIMITS = {
   view: { max: 120, windowSec: 60 }, // per IP on /s/[token]
   events: { max: 60, windowSec: 600 }, // per IP
   adminLogin: { max: 5, windowSec: 900 }, // per IP
+  contentReport: { max: 5, windowSec: 3600 }, // per IP
+  contentReportPerSurprise: { max: 20, windowSec: 86400 }, // per surprise
+  alertEmail: { max: 4, windowSec: 3600 }, // per alert kind (owner's inbox)
 } as const;
 
 export type LimitName = keyof typeof LIMITS;

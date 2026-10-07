@@ -1,6 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { log, errorMessage } from "@/lib/log";
+import { alert } from "@/lib/alerts";
 
 /**
  * An error that is safe to show the customer. Anything else becomes a generic
@@ -47,6 +48,7 @@ export function jsonError(err: unknown, context: string): NextResponse {
     );
   }
   log.error("unhandled_error", { context, error: errorMessage(err) });
+  alert("server_error", { "Where": context });
   return NextResponse.json(
     {
       error: {

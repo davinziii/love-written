@@ -5,7 +5,7 @@ import { Errors, route } from "@/lib/errors";
 import { EDIT_TOKEN_HEADER, readJson } from "@/lib/security/request";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
 import { canEdit, draftExpiryFrom, EDITABLE_STAGES, requiresStrictSave } from "@/lib/lifecycle";
-import { authorizeEdit, getMedia, mediaFieldSet } from "@/lib/surprises/repo";
+import { authorizeEdit, getMedia, mediaFieldSet, touchCustomerActivity } from "@/lib/surprises/repo";
 import { buildStudioState } from "@/lib/surprises/state";
 import { getTemplate } from "@/templates";
 import { validateCustomerData } from "@/templates/schema";
@@ -16,6 +16,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export const GET = route("load_draft", async (req: Request, ctx: Ctx) => {
   const { id } = await ctx.params;
   const row = await authorizeEdit(id, req.headers.get(EDIT_TOKEN_HEADER));
+  await touchCustomerActivity(row);
   return NextResponse.json(await buildStudioState(row, { withMedia: true }));
 });
 
@@ -50,6 +51,7 @@ export const PATCH = route("save_draft", async (req: Request, ctx: Ctx) => {
     content: result.data.content,
     style: result.data.style,
     draft_expires_at: draftExpiryFrom(new Date()).toISOString(),
+    last_customer_activity_at: new Date().toISOString(),
   };
   if (row.stage === "DRAFT") update.stage = "CUSTOMIZING";
   // Reveal timing of a scheduled surprise changes only through /publish (reschedule).

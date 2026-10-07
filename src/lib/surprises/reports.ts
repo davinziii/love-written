@@ -5,6 +5,7 @@ import { log } from "@/lib/log";
 import { UNIQUE_VIOLATION, type ReportRow, type SurpriseRow } from "@/lib/db-types";
 import { generateReportCode } from "@/lib/security/tokens";
 import { latestPublishOperation, paidOrderWithPayment } from "./repo";
+import { alert } from "@/lib/alerts";
 
 /**
  * "Report This Problem" for a paid surprise whose publishing failed.
@@ -45,6 +46,7 @@ export async function createFailedPublishReport(
       });
     if (!error) {
       log.info("report_created", { surpriseId: row.id, reportCode, operationId: op.id });
+      alert("failed_publish_report", { "Report": reportCode, "Order": paid?.order.order_number, "Reason": op.error_code ?? undefined });
       return { reportCode };
     }
     if (error.code !== UNIQUE_VIOLATION) throw new Error(`create report: ${error.message}`);

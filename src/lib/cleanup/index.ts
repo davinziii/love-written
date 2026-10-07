@@ -3,6 +3,7 @@ import { db } from "@/lib/supabase/admin";
 import { log, errorMessage } from "@/lib/log";
 import type { CleanupJobRow } from "@/lib/db-types";
 import { listSurpriseObjects, removeObjects } from "@/lib/media/storage";
+import { alert } from "@/lib/alerts";
 
 /**
  * Deletion lifecycle. A surprise is only marked DELETED after its photos and content
@@ -109,7 +110,10 @@ export async function runCleanupJob(jobId: string, { force = false } = {}): Prom
     // Never claim DELETED when deletion failed.
     await db().from("surprises").update({ stage: exhausted ? "CLEANUP_FAILED" : "EXPIRED" }).eq("id", surpriseId).neq("stage", "PUBLISHED");
 
-    if (exhausted) log.error("cleanup_needs_admin", { surpriseId, jobId: job.id, attempts, error: message });
+    if (exhausted) {
+      log.error("cleanup_needs_admin", { surpriseId, jobId: job.id, attempts, error: message });
+      alert("cleanup_needs_admin", { "Surprise": surpriseId, "Attempts": attempts, "Files remaining": remaining.length });
+    }
     else log.warn("cleanup_failed_will_retry", { surpriseId, jobId: job.id, attempts, error: message });
     return { jobId: job.id, surpriseId, ok: false, error: message };
   }

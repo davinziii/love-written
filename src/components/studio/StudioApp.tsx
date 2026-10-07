@@ -9,6 +9,7 @@ import { useStudio, type SaveStatus } from "./useStudio";
 import { CustomizeStep, PreviewStep } from "./EditSteps";
 import { EndedPanel, FinalizePanel, LivePanel, PaymentPending, PublishFailedPanel, ScheduledPanel } from "./AfterPayment";
 import { Notice } from "./parts";
+import { UNPUBLISHED_PAID_TTL_DAYS } from "@/lib/lifecycle";
 
 type Step = "customize" | "preview" | "payment";
 const SELF_SERVE_STEPS = ["Make it yours", "Preview", "Pay", "Reveal"];
@@ -108,7 +109,14 @@ export function StudioApp({ surpriseId }: { surpriseId: string }) {
     case "finalize":
       activeStep = publishStep;
       body = editingAfterPay ? (
-        <CustomizeStep studio={studio} watermark={false} continueLabel="Done editing" onContinue={() => setEditingAfterPay(false)} />
+        <CustomizeStep
+          studio={studio}
+          watermark={false}
+          continueLabel="Done editing"
+          onContinue={() => setEditingAfterPay(false)}
+          onBack={() => setEditingAfterPay(false)}
+          backLabel="Go back"
+        />
       ) : (
         <FinalizePanel studio={studio} onEdit={() => setEditingAfterPay(true)} />
       );
@@ -125,6 +133,8 @@ export function StudioApp({ surpriseId }: { surpriseId: string }) {
           watermark={false}
           continueLabel="Done editing"
           onContinue={() => setEditingAfterPay(false)}
+          onBack={() => setEditingAfterPay(false)}
+          backLabel="Go back to your scheduled surprise"
           intro={<Notice>Your surprise is scheduled. Changes save automatically and every required field must stay filled in.</Notice>}
         />
       ) : (
@@ -156,6 +166,12 @@ function WelcomeNotice({ paidFirst, isNew }: { paidFirst: boolean; isNew: boolea
       <p className="text-sm text-ink-soft">
         Everything saves automatically. Your recovery code is below — keep it to come back on any device.
       </p>
+      {paidFirst && (
+        <p className="mt-1 text-xs text-ink-soft">
+          Take your time — just don&rsquo;t leave it unopened for {UNPUBLISHED_PAID_TTL_DAYS} days before publishing, or
+          it&rsquo;s deleted.
+        </p>
+      )}
     </Notice>
   );
 }

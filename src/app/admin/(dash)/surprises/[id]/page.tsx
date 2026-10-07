@@ -10,6 +10,7 @@ import { TemplateExperience } from "@/templates/renderers";
 import { buildRenderData } from "@/templates/render-data";
 import { getTemplate, isTemplateId } from "@/templates";
 import { formatPeso } from "@/lib/format";
+import { UNPUBLISHED_PAID_TTL_DAYS } from "@/lib/lifecycle";
 import { deleteNowAction, disableSurpriseAction, retryPublishAction } from "../../actions";
 
 type Props = { params: Promise<{ id: string }> };
@@ -58,6 +59,14 @@ export default async function SurpriseDetailPage({ params }: Props) {
               <Item label="Expires">{fmt(s.expires_at)}</Item>
               <Item label="Opens">{s.open_count} {s.first_opened_at ? `(first ${fmt(s.first_opened_at)})` : ""}</Item>
               <Item label="Locked">{fmt(s.locked_at)}</Item>
+              <Item label="Last customer visit">
+                {fmt(s.last_customer_activity_at)}
+                {s.payment_status === "PAID" && ["DRAFT", "CUSTOMIZING", "READY_TO_PUBLISH"].includes(s.stage) && (
+                  <span className="block text-xs text-ink-soft">
+                    Deleted if not opened by {fmt(new Date(new Date(s.last_customer_activity_at).getTime() + UNPUBLISHED_PAID_TTL_DAYS * 86_400_000).toISOString())}
+                  </span>
+                )}
+              </Item>
               <Item label="Cleanup">{cleanup ? <Badge value={cleanup.status} /> : "—"}</Item>
               <Item label="Photos">{media.length} · {(media.reduce((n, m) => n + m.bytes, 0) / 1024).toFixed(0)} KB</Item>
             </dl>

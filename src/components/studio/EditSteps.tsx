@@ -19,12 +19,17 @@ export function CustomizeStep({
   onContinue,
   continueLabel = "Preview your surprise",
   intro,
+  onBack,
+  backLabel = "Go back",
 }: {
   studio: Studio;
   watermark: boolean;
   onContinue: () => void;
   continueLabel?: string;
   intro?: React.ReactNode;
+  /** Shows a "Go back" button at the top (e.g. when re-editing a scheduled surprise). */
+  onBack?: () => void;
+  backLabel?: string;
 }) {
   const [showPreview, setShowPreview] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
@@ -45,6 +50,14 @@ export function CustomizeStep({
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px]">
       <div className="space-y-6 pb-28 lg:pb-10">
+        {onBack && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Button variant="secondary" onClick={onBack} disabled={studio.uploading} className="px-4 py-2 text-sm">
+              ← {backLabel}
+            </Button>
+            <span className="text-xs text-ink-soft">Changes save automatically.</span>
+          </div>
+        )}
         {intro}
         <GenericEditor
           template={template}

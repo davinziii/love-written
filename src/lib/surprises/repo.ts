@@ -96,6 +96,15 @@ export async function redeemRecoveryCode(code: string) {
   return { surpriseId: data.id as string, templateId: data.template_id as string, editToken };
 }
 
+/**
+ * Record that the customer (not an admin) opened their surprise. Drives the 60-day rule for
+ * unpublished paid surprises. Written at most once an hour to keep reads cheap.
+ */
+export async function touchCustomerActivity(row: SurpriseRow): Promise<void> {
+  if (Date.now() - new Date(row.last_customer_activity_at).getTime() < 3_600_000) return;
+  await db().from("surprises").update({ last_customer_activity_at: new Date().toISOString() }).eq("id", row.id);
+}
+
 export function customerData(row: SurpriseRow): CustomerData {
   return { content: row.content ?? {}, style: row.style ?? {} };
 }

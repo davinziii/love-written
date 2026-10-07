@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { LogoMark } from "@/components/ui/Brand";
+import { LinkPending } from "@/components/ui/LinkPending";
 
 export interface AttentionCounts {
   failedPublish: number;
@@ -169,6 +170,7 @@ function NavGroup({
                   <Glyph size={18} />
                 </span>
                 {item.label}
+                <LinkPending className="ml-auto text-rose" />
                 {item.badge ? (
                   <span className="ml-auto rounded-full bg-rose px-2 py-0.5 text-[11px] font-semibold text-white">{item.badge}</span>
                 ) : null}

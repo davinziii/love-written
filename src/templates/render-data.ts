@@ -1,5 +1,5 @@
 import type { CustomerData } from "./schema";
-import type { TemplateDefinition } from "./types";
+import { isStyleField, type TemplateDefinition } from "./types";
 
 /**
  * Merge stored customer data with resolved image URLs into the flat object a renderer
@@ -14,7 +14,8 @@ export function buildRenderData(
   const out: Record<string, string | undefined> = {};
   for (const field of template.fields) {
     if (field.type === "image") out[field.id] = imageUrls[field.id];
-    else out[field.id] = data.content[field.id] ?? data.style[field.id];
+    // Each field is read only from its own bucket (style fields from style, the rest from content).
+    else out[field.id] = isStyleField(field) ? data.style[field.id] : data.content[field.id];
   }
   return out;
 }

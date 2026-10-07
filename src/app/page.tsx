@@ -157,14 +157,14 @@ export default function LandingPage() {
               <Reveal className="md:col-span-2" delay={120}>
                 <article className="lw-lift h-full rounded-[2rem] bg-white p-7 ring-1 ring-line">
                   <FeatureLabel icon={Icon.sparkle}>Your style</FeatureLabel>
-                  <div className="mt-3 flex gap-2" aria-label="Five color themes">
+                  <div className="mt-3 flex flex-wrap gap-2" aria-label="Ten color themes">
                     {Object.values(THEMES).map((t) => (
                       <span key={t.id} title={t.label} className="grid h-8 w-8 place-items-center rounded-full ring-1 ring-black/5 transition hover:scale-110" style={{ background: t.bg }}>
                         <span className="h-3.5 w-3.5 rounded-full" style={{ background: t.accent }} />
                       </span>
                     ))}
                   </div>
-                  <p className="mt-3 text-sm text-ink-soft">Five color themes and five type styles.</p>
+                  <p className="mt-3 text-sm text-ink-soft">Ten color themes, plus fonts for your story and your final message.</p>
                 </article>
               </Reveal>
               <Reveal className="md:col-span-2" delay={180}>

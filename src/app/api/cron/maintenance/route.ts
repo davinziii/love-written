@@ -3,6 +3,7 @@ import { env } from "@/lib/env";
 import { safeEqual } from "@/lib/security/tokens";
 import { runMaintenance } from "@/lib/surprises/lifecycle-jobs";
 import { log, errorMessage } from "@/lib/log";
+import { alert } from "@/lib/alerts";
 
 export const maxDuration = 60;
 
@@ -20,6 +21,7 @@ export async function GET(req: Request) {
     return NextResponse.json(await runMaintenance());
   } catch (err) {
     log.error("maintenance_failed", { error: errorMessage(err) });
+    alert("maintenance_failed", { "Error": errorMessage(err).slice(0, 200) });
     return NextResponse.json({ error: "maintenance failed" }, { status: 500 });
   }
 }

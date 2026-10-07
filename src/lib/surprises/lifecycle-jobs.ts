@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/lib/supabase/admin";
 import { log, errorMessage } from "@/lib/log";
 import type { SurpriseRow } from "@/lib/db-types";
+import { UNPUBLISHED_PAID_TTL_DAYS } from "@/lib/lifecycle";
 import { enqueueCleanup, processDueCleanupJobs } from "@/lib/cleanup";
 import { failStaleOperations, publishSurprise, type PublishResult } from "./publish";
 
@@ -47,6 +48,7 @@ export interface MaintenanceSummary {
   activationFailures: number;
   expired: number;
   abandonedDrafts: number;
+  idlePaidDeleted: number;
   cleanupSucceeded: number;
   cleanupFailed: number;
 }
@@ -58,6 +60,7 @@ export async function runMaintenance(): Promise<MaintenanceSummary> {
     activationFailures: 0,
     expired: 0,
     abandonedDrafts: 0,
+    idlePaidDeleted: 0,
     cleanupSucceeded: 0,
     cleanupFailed: 0,
   };
@@ -104,6 +107,22 @@ export async function runMaintenance(): Promise<MaintenanceSummary> {
   for (const row of abandoned ?? []) {
     await enqueueCleanup(row.id as string, "abandoned_draft");
     summary.abandonedDrafts++;
+  }
+
+  // 3b. Paid but never published, and the customer hasn't opened it for 60 days.
+  //     Only the customer's own visits count (see touchCustomerActivity); admin views don't.
+  const idleSince = new Date(Date.now() - UNPUBLISHED_PAID_TTL_DAYS * 86_400_000).toISOString();
+  const { data: idlePaid } = await db()
+    .from("surprises")
+    .update({ stage: "EXPIRED" })
+    .eq("payment_status", "PAID")
+    .in("stage", ["DRAFT", "CUSTOMIZING", "READY_TO_PUBLISH"])
+    .lte("last_customer_activity_at", idleSince)
+    .select("id");
+  for (const row of idlePaid ?? []) {
+    await enqueueCleanup(row.id as string, "unpublished_paid");
+    log.info("idle_paid_surprise_expired", { surpriseId: row.id as string });
+    summary.idlePaidDeleted++;
   }
 
   // 4. Run due deletions (including retries).

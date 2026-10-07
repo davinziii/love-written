@@ -37,7 +37,7 @@ export function ImageFieldControl({
         ref={inputRef}
         id={id}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
         className="sr-only"
         disabled={disabled || busy}
         onChange={(e) => {
@@ -86,7 +86,7 @@ export function ImageFieldControl({
         >
           {busy ? <Spinner className="text-rose" /> : <span className="text-2xl text-rose" aria-hidden>＋</span>}
           <span className="font-medium text-ink">{busy ? "Uploading…" : "Upload photo"}</span>
-          <span className="text-xs">JPG, PNG or WebP · up to 10 MB · we optimize it for you</span>
+          <span className="text-xs">JPG, PNG, WebP or HEIC · up to 10 MB · we optimize it for you</span>
         </button>
       )}
       {state?.error && (

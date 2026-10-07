@@ -8,6 +8,7 @@ import { UNIQUE_VIOLATION, type PublishOperationRow, type SurpriseRow } from "@/
 import { canPublish, expiryFrom, PUBLISHABLE_STAGES, validateScheduleTime } from "@/lib/lifecycle";
 import { randomToken } from "@/lib/security/tokens";
 import { listSurpriseObjects } from "@/lib/media/storage";
+import { alert } from "@/lib/alerts";
 import { getTemplate } from "@/templates";
 import { validateCustomerData } from "@/templates/schema";
 import { customerData, getMedia, getSurprise, mediaFieldSet } from "./repo";
@@ -175,6 +176,7 @@ export async function publishSurprise(req: PublishRequest): Promise<PublishResul
       .in("stage", PUBLISHABLE_STAGES as string[])
       .is("locked_at", null);
     log.error("publish_failed", { surpriseId: row.id, operationId: op.id, code, error: message });
+    alert("publish_failed", { "Surprise": row.id, "Operation": op.id, "Reason": code, "Started by": req.source });
     await track("publish_failed", { templateId: row.template_id, surpriseId: row.id });
     return { status: "FAILED", operationId: op.id, errorCode: code };
   }

@@ -52,6 +52,8 @@ export interface FontField extends BaseField {
   type: "font";
   options: readonly FontId[];
   default: FontId;
+  /** Sample text shown on each option in the editor (default "Aa"). */
+  previewText?: string;
 }
 
 export interface MusicField extends BaseField {

@@ -29,6 +29,8 @@ export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
 export const HOSTING_DAYS = 30;
 export const DRAFT_TTL_DAYS = 14;
+/** A PAID surprise that is never published is deleted after this many days without a customer visit. */
+export const UNPUBLISHED_PAID_TTL_DAYS = 60;
 export const MIN_SCHEDULE_LEAD_MINUTES = 5;
 export const MAX_SCHEDULE_DAYS_AHEAD = 180;
 

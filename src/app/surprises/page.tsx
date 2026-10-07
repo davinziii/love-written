@@ -20,8 +20,10 @@ export default function CatalogPage() {
   return (
     <>
       <SiteHeader />
-      <main className="relative isolate mx-auto max-w-6xl px-4 py-14 sm:px-6">
+      {/* Full-width background: the blobs span the whole page, not just the content box. */}
+      <div className="relative isolate overflow-x-clip">
         <GradientBlobs variant="soft" />
+        <main className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
         <ResumeDraftBanner />
         <Reveal className="mx-auto max-w-2xl text-center">
           <Eyebrow icon={(p) => <HeartIcon {...p} />}>Pick a Surprise</Eyebrow>
@@ -75,7 +77,8 @@ export default function CatalogPage() {
             </div>
           </Reveal>
         </ul>
-      </main>
+        </main>
+      </div>
       <SiteFooter />
     </>
   );

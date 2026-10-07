@@ -12,7 +12,7 @@ describe("generic schema validation", () => {
   it("accepts an empty draft and fills style defaults", () => {
     const r = validateCustomerData(t, { content: {}, style: {} }, { mode: "draft", imageFieldsPresent: noImages });
     expect(r.ok).toBe(true);
-    expect(r.data.style).toEqual({ theme: "blush", font: "classic", music: "none" });
+    expect(r.data.style).toEqual({ theme: "blush", story_font: "lora", final_font: "great_vibes", music: "none" });
   });
 
   it("strict mode reports every missing required field, including photos", () => {
@@ -48,8 +48,18 @@ describe("generic schema validation", () => {
   });
 
   it("rejects style values outside the curated options", () => {
-    const r = validateCustomerData(t, { style: { theme: "hotpink", font: "comic-sans", music: "spotify:track" } }, { mode: "draft", imageFieldsPresent: noImages });
-    expect(Object.keys(r.errors).sort()).toEqual(["font", "music", "theme"]);
+    const r = validateCustomerData(
+      t,
+      { style: { theme: "hotpink", story_font: "comic-sans", final_font: "great_vibes_typo", music: "spotify:track" } },
+      { mode: "draft", imageFieldsPresent: noImages },
+    );
+    expect(Object.keys(r.errors).sort()).toEqual(["final_font", "music", "story_font", "theme"]);
+  });
+
+  it("story and final-message fonts only accept their own curated lists", () => {
+    // A script font can't be used for the story, and a story font can't be the final font.
+    const r = validateCustomerData(t, { style: { story_font: "great_vibes", final_font: "lora" } }, { mode: "draft", imageFieldsPresent: noImages });
+    expect(Object.keys(r.errors).sort()).toEqual(["final_font", "story_font"]);
   });
 
   it("rejects invalid dates and non-string values", () => {

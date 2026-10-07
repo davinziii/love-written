@@ -60,7 +60,7 @@ export function SiteFooter() {
       <HeartIcon size={220} className="pointer-events-none absolute -right-10 top-10 -z-10 rotate-12 text-white/[0.03]" />
 
       <div className="mx-auto max-w-6xl px-4 pb-10 pt-16 sm:px-6">
-        <div className="grid gap-12 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
           <div>
             <Link href="/" className="inline-flex items-center gap-2 font-display text-3xl tracking-tight">
               <LogoMark size={34} />
@@ -107,6 +107,12 @@ export function SiteFooter() {
                 </a>
               </li>
             )}
+          </FooterColumn>
+
+          <FooterColumn title="Legal">
+            <FooterLink href="/privacy">Privacy Notice</FooterLink>
+            <FooterLink href="/terms">Terms of Service</FooterLink>
+            <FooterLink href="/terms#acceptable-use">Community rules</FooterLink>
           </FooterColumn>
         </div>
 

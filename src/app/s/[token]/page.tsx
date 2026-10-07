@@ -17,6 +17,8 @@ import { getTemplate, isTemplateId } from "@/templates";
 import { buildRenderData } from "@/templates/render-data";
 import { TemplateExperience } from "@/templates/renderers";
 import { NotYet, ViewerMessage } from "@/components/viewer/ViewerStates";
+import { ReportSurprise } from "@/components/viewer/ReportSurprise";
+import { getTheme } from "@/templates/styles";
 
 // Generic metadata only: link previews in chat apps must not reveal names or photos.
 export const metadata: Metadata = {
@@ -91,6 +93,8 @@ export default async function SurprisePage({ params }: Props) {
 
   const media = await getMedia(row.id);
   const data = buildRenderData(template, customerData(row), await mediaUrlsByField(media));
+  // Shared style convention: themes live in style.theme for every template.
+  const theme = getTheme(row.style?.theme);
 
   // Count opens (no per-viewer data). The funnel event is recorded on the first open only.
   const { data: firstOpen, error } = await db().rpc("record_surprise_open", { p_id: row.id });
@@ -98,8 +102,11 @@ export default async function SurprisePage({ params }: Props) {
   else if (firstOpen === true) await track("recipient_opened", { templateId: row.template_id, surpriseId: row.id });
 
   return (
-    <div style={{ "--lw-screen-h": "100svh" } as CSSProperties}>
+    <div
+      style={{ "--lw-screen-h": "100svh", "--lw-bg": theme.bg, "--lw-muted": theme.muted, background: theme.bg } as CSSProperties}
+    >
       <TemplateExperience templateId={row.template_id} data={data} mode="live" />
+      <ReportSurprise token={token} />
     </div>
   );
 }

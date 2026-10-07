@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { listSurprises, type AdminSurprise, type SurpriseListView } from "@/lib/admin/queries";
 import { PageTitle, PrimaryLink, SurpriseList } from "@/components/admin/ui";
 import { isManualPayments } from "@/lib/payments/mode";
+import { LinkPending } from "@/components/ui/LinkPending";
 
 const TABS: { view: SurpriseListView; label: string; dateLabel: string; dateOf: (r: AdminSurprise) => string | null; empty: string }[] = [
   { view: "all", label: "All", dateLabel: "Updated", dateOf: (r) => r.updated_at, empty: "No surprises yet." },
@@ -36,11 +37,12 @@ export default async function SurprisesPage({ searchParams }: Props) {
               key={t.view}
               href={t.view === "all" ? "/admin/surprises" : `/admin/surprises?view=${t.view}`}
               aria-current={active ? "page" : undefined}
-              className={`whitespace-nowrap rounded-full px-4 py-2 text-sm transition ${
+              className={`inline-flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm transition ${
                 active ? "bg-ink text-white shadow-sm" : "bg-soft text-ink-soft hover:bg-[#eef0f3] hover:text-ink"
               }`}
             >
               {t.label}
+              <LinkPending />
             </Link>
           );
         })}
