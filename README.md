@@ -1,7 +1,7 @@
 # Love, Written
 
 Personalized digital surprises. A customer picks a professionally designed interactive
-template, adds their words and photos, previews it (watermarked), pays ₱199 through PayMongo,
+template, adds their words and photos, previews it (watermarked), pays ₱99 through PayMongo,
 and publishes it now or on a schedule. The recipient opens a private link. It stays online for
 30 days after going live, then its photos and content are deleted and the deletion is verified.
 

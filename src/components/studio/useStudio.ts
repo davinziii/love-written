@@ -9,6 +9,7 @@ import { canEdit } from "@/lib/lifecycle";
 import { api, ClientApiError } from "@/lib/client/api";
 import { getLocalDraft, putLocalDraft } from "@/lib/client/drafts";
 import { prepareImage, ImagePrepError } from "@/lib/client/image";
+import { inAppBrowserName } from "@/lib/client/in-app-browser";
 import type { ImageState } from "@/components/editor/ImageFieldControl";
 
 export type Phase = "loading" | "unauthorized" | "not_found" | "error" | "ready";
@@ -107,6 +108,7 @@ export function useStudio(surpriseId: string) {
         method: "PATCH",
         editToken: token.current,
         body: { content: snapshot.data.content, style: snapshot.data.style, reveal: snapshot.reveal },
+        retries: 1, // saving the same snapshot twice is harmless; longer outages retry below
       });
       if (!dirty.current) putLocalDraft({ surpriseId, templateId: state?.templateId ?? "", editToken: token.current, dirty: false });
       setErrors({});
@@ -189,10 +191,12 @@ export function useStudio(surpriseId: string) {
         const form = new FormData();
         form.append("fieldId", field.id);
         form.append("file", blob, "photo");
+        // Replacing a field's photo is safe to repeat, so retry if the connection drops.
         const res = await api<{ url: string | null }>(`/api/surprises/${surpriseId}/media`, {
           method: "POST",
           editToken: token.current,
           body: form,
+          retries: 2,
         });
         setImages((p) => ({ ...p, [field.id]: { url: res.url ?? preview } }));
         setErrors((prev) => {
@@ -201,9 +205,11 @@ export function useStudio(surpriseId: string) {
         });
       } catch (err) {
         const message =
-          err instanceof ImagePrepError || err instanceof ClientApiError
-            ? err.message
-            : "We couldn't upload that photo. Please try again.";
+          err instanceof ClientApiError && err.code === "NETWORK"
+            ? "The upload was interrupted. Tap the photo to try again."
+            : err instanceof ImagePrepError || err instanceof ClientApiError
+              ? err.message
+              : "We couldn't upload that photo. Please try again.";
         setImages((p) => ({ ...p, [field.id]: { url: previous?.url, error: message } }));
         URL.revokeObjectURL(preview);
       }
@@ -220,6 +226,7 @@ export function useStudio(surpriseId: string) {
         await api(`/api/surprises/${surpriseId}/media?fieldId=${encodeURIComponent(field.id)}`, {
           method: "DELETE",
           editToken: token.current,
+          retries: 2,
         });
         setImages((p) => {
           const { [field.id]: _removed, ...rest } = p;
@@ -288,7 +295,9 @@ export type Studio = ReturnType<typeof useStudio>;
  * Private customization links (manual workflow) look like
  *   /studio/<id>#access=<edit token>&code=<recovery code>
  * The fragment never reaches the server. Save it on this device, then strip it from the
- * address bar so it isn't left in history or accidentally shared in a screenshot.
+ * address bar so it isn't left in history or accidentally shared in a screenshot —
+ * except inside in-app browsers (Messenger, …), where "⋯ → Open in browser" passes the
+ * current address to Chrome/Safari and needs the access code to still be there.
  */
 function adoptAccessFromLink(surpriseId: string) {
   const hash = window.location.hash.slice(1);
@@ -307,5 +316,6 @@ function adoptAccessFromLink(surpriseId: string) {
     // old token can't be saved anyway, so don't try to restore them.
     dirty: existing?.editToken === editToken ? existing.dirty : false,
   });
+  if (inAppBrowserName(navigator.userAgent)) return;
   window.history.replaceState(null, "", window.location.pathname + window.location.search);
 }

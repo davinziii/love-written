@@ -9,6 +9,7 @@ import { useStudio, type SaveStatus } from "./useStudio";
 import { CustomizeStep, PreviewStep } from "./EditSteps";
 import { EndedPanel, FinalizePanel, LivePanel, PaymentPending, PublishFailedPanel, ScheduledPanel } from "./AfterPayment";
 import { Notice } from "./parts";
+import { InAppBrowserNotice } from "./InAppBrowserNotice";
 import { UNPUBLISHED_PAID_TTL_DAYS } from "@/lib/lifecycle";
 
 type Step = "customize" | "preview" | "payment";
@@ -153,6 +154,7 @@ export function StudioApp({ surpriseId }: { surpriseId: string }) {
 
   return (
     <Shell saveStatus={studio.saveStatus} activeStep={activeStep} labels={labels} templateName={studio.template.name}>
+      <InAppBrowserNotice surpriseId={surpriseId} />
       {body}
     </Shell>
   );
