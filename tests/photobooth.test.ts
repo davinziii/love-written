@@ -43,6 +43,19 @@ describe("photobooth images", () => {
     expect(data[0]).toBe(data[1]); // grayscale
   });
 
+  it("uses the chosen filter: color keeps color, B&W turns grey", async () => {
+    const frame = getFrame("white")!;
+    const rounds = await Promise.all([1, 2, 3, 4].map(async (round) => ({ round, a: await photo("#ff0000"), b: await photo("#0000ff") })));
+    const slot = frame.slots[0];
+    const pixel = async (buf: Buffer) =>
+      (await sharp(buf).extract({ left: slot.x + 100, top: slot.y + 300, width: 1, height: 1 }).raw().toBuffer({ resolveWithObject: true })).data;
+    const color = await pixel(await composeStrip(frame, rounds, { grayscale: false }));
+    expect(color[0]).toBeGreaterThan(200); // red stays red
+    expect(color[2]).toBeLessThan(60);
+    const bw = await pixel(await composeStrip(frame, rounds, { grayscale: true }));
+    expect(bw[0]).toBe(bw[2]);
+  });
+
   it("rejects the wrong number of photos", async () => {
     await expect(composeStrip(getFrame("black-white")!, [])).rejects.toThrow();
   });

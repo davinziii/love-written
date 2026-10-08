@@ -87,6 +87,8 @@ export async function deleteBooth(s: PhotoboothSessionRow, { force = false } = {
     const remaining = await listFolder(folder);
     if (remaining.length > 0) throw new Error(`${remaining.length} file(s) still in storage`);
 
+    const { error: mErr } = await db().from("photobooth_messages").delete().eq("session_id", s.id);
+    if (mErr) throw new Error(`delete messages: ${mErr.message}`);
     const { error: rErr } = await db().from("photobooth_rounds").delete().eq("session_id", s.id);
     if (rErr) throw new Error(`delete rounds: ${rErr.message}`);
     const { error: pErr } = await db().from("photobooth_participants").delete().eq("session_id", s.id);

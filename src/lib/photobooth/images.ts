@@ -60,7 +60,11 @@ async function fit(photo: Buffer, width: number, height: number, grayscale: bool
  * The final strip: photos go into the frame's slots (A left, B right), then the overlay on
  * top. Everything comes from the frame config — no frame is special-cased here.
  */
-export async function composeStrip(frame: PhotoboothFrame, rounds: RoundPhotos[]): Promise<Buffer> {
+export async function composeStrip(
+  frame: PhotoboothFrame,
+  rounds: RoundPhotos[],
+  { grayscale = frame.grayscale }: { grayscale?: boolean } = {},
+): Promise<Buffer> {
   if (rounds.length !== frame.slots.length) throw new Error(`expected ${frame.slots.length} rounds, got ${rounds.length}`);
   const layers: OverlayOptions[] = [];
   for (const [i, slot] of frame.slots.entries()) {
@@ -68,8 +72,8 @@ export async function composeStrip(frame: PhotoboothFrame, rounds: RoundPhotos[]
     const leftW = Math.floor((slot.width - frame.gutter) / 2);
     const rightW = slot.width - frame.gutter - leftW;
     layers.push(
-      { input: await fit(r.a, leftW, slot.height, frame.grayscale), left: slot.x, top: slot.y },
-      { input: await fit(r.b, rightW, slot.height, frame.grayscale), left: slot.x + leftW + frame.gutter, top: slot.y },
+      { input: await fit(r.a, leftW, slot.height, grayscale), left: slot.x, top: slot.y },
+      { input: await fit(r.b, rightW, slot.height, grayscale), left: slot.x + leftW + frame.gutter, top: slot.y },
     );
   }
   if (frame.overlay) {

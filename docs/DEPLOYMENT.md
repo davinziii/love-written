@@ -24,7 +24,8 @@ Supabase                PayMongo
    Then run `supabase/migrations/0002_manual_payments.sql` (manual payment workflow) and
    `supabase/migrations/0003_activity_and_content_reports.sql` (60-day rule + abuse reports).
    Then `0004_admin_access_copy.sql` (admin copy of private links) and
-   `0005_photobooth.sql` and `0006_photobooth_live_video.sql` (Photobooth — see docs/PHOTOBOOTH.md).
+   `0005_photobooth.sql`, `0006_photobooth_live_video.sql` and `0007_photobooth_names_chat_design.sql`
+   (Photobooth — see docs/PHOTOBOOTH.md).
 3. **Settings → API**: copy the URL, `anon` key and `service_role` key into Vercel env vars.
    The service role key is server-only — never prefix it with `NEXT_PUBLIC_`.
 4. **Create the admin:**

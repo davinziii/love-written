@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "@/lib/supabase/admin";
 import { Errors } from "@/lib/errors";
 import { log, errorMessage } from "@/lib/log";
-import type { BoothContext } from "./session";
+import { liveViewOn, type BoothContext } from "./session";
 import { nudge } from "./realtime";
 import type { RtcSignal } from "./types";
 
@@ -58,10 +58,12 @@ const MAX_SDP = 16_000;
  */
 export async function saveSignal(ctx: BoothContext, signal: RtcSignal): Promise<void> {
   const { session, me } = ctx;
-  if (session.status !== "PAID" && session.status !== "IN_PROGRESS") throw Errors.conflict("BOOTH_STALE", "The live view isn't available right now.");
-  const allowed = me.role === "A" ? signal.type === "offer" : signal.type === "answer" || signal.type === "request";
+  if (!liveViewOn(session.status)) throw Errors.conflict("BOOTH_STALE", "The live view isn't available right now.");
+  const allowed =
+    signal.type === "pause" || (me.role === "A" ? signal.type === "offer" : signal.type === "answer" || signal.type === "request");
   if (!allowed) throw Errors.badRequest();
-  if ((signal.type === "request") !== (signal.sdp === undefined)) throw Errors.badRequest();
+  const needsSdp = signal.type === "offer" || signal.type === "answer";
+  if (needsSdp !== (signal.sdp !== undefined)) throw Errors.badRequest();
   if (signal.sdp && signal.sdp.length > MAX_SDP) throw Errors.badRequest();
 
   const { error } = await db().from("photobooth_participants").update({ rtc_signal: signal }).eq("id", me.id);

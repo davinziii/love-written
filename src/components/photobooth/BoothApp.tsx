@@ -3,49 +3,60 @@
 /* eslint-disable @next/next/no-img-element -- photos are private signed URLs */
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Logo } from "@/components/ui/Brand";
 import { Button, Spinner } from "@/components/ui/Button";
 import { HeartIcon, Icon } from "@/components/ui/icons";
 import { InAppBrowserNotice } from "@/components/studio/InAppBrowserNotice";
 import { ClientApiError, newIdempotencyKey } from "@/lib/client/api";
 import { boothApi, ownLink } from "@/lib/photobooth/client";
+import { stableUrl } from "@/lib/photobooth/stable-url";
 import { PHOTOBOOTH_RETENTION_DAYS, PHOTOBOOTH_TIMEZONE, RECONNECT_WINDOW_MS } from "@/lib/photobooth/constants";
-import type { BoothState, CameraIssue } from "@/lib/photobooth/types";
+import type { BoothState, CameraIssue, StripFilter } from "@/lib/photobooth/types";
 import { formatPeso } from "@/lib/format";
-import { DEFAULT_FRAME_ID, FRAMES } from "@/photobooth/frames";
+import { DEFAULT_FRAME_ID, FRAMES, getFrame } from "@/photobooth/frames";
 import { useBooth } from "./useBooth";
 import { useCamera, type Camera } from "./useCamera";
 import { useLiveVideo, type LiveStatus } from "./useLiveVideo";
+import { useIdle } from "./useIdle";
 import { CameraTrouble, CameraView, Card, CopyButton, Countdown, PartnerStatus, Progress, SplitView, SupportLine } from "./BoothParts";
+import { StripPreview } from "./StripPreview";
+import { BoothChat } from "./BoothChat";
 import s from "./photobooth.module.css";
 
 /**
  * One participant's photobooth. The server state decides the screen:
- *   AWAITING_PAYMENT → PAID (camera check · invite · design · 7-day notice · waiting)
- *   → IN_PROGRESS (ready → countdown → review, ×4) → GENERATING → COMPLETED
+ *   AWAITING_PAYMENT → PAID (name · camera check · invite · 7-day notice · waiting)
+ *   → IN_PROGRESS (ready → countdown → review, ×4) → DESIGNING (filter + frame)
+ *   → GENERATING → COMPLETED
+ * From the lobby on: live strip preview on the left, the two of you in the middle,
+ * chat on the right (stacked on phones).
  */
 export function BoothApp({ sessionId, justPaid, cancelled }: { sessionId: string; justPaid: boolean; cancelled: boolean }) {
-  const booth = useBooth(sessionId);
+  const idle = useIdle(true);
+  const booth = useBooth(sessionId, { slow: idle.state === "paused" });
   const camera = useCamera();
   const [away, setAway] = useState(false);
   const { state, token } = booth;
+  const status = state?.status;
 
   // Camera on while it's needed, off otherwise (never left running in the background).
-  const needsCamera = !away && (state?.status === "PAID" || state?.status === "IN_PROGRESS");
-  const autoStart = needsCamera && (state?.me.cameraReady || state?.status === "IN_PROGRESS");
+  const needsCamera = !away && (status === "PAID" || status === "IN_PROGRESS" || status === "DESIGNING");
+  const autoStart = needsCamera && Boolean(state?.me.cameraReady || status === "IN_PROGRESS");
   const { start, stop, status: camStatus } = camera;
   useEffect(() => {
     if (autoStart && camStatus === "idle") void start();
     if (!needsCamera && camStatus === "ready") stop();
   }, [autoStart, needsCamera, camStatus, start, stop]);
 
-  // Live view: see each other for the whole session (once your camera works).
+  // Live view: see each other from the lobby until the look is chosen. Paused while away.
+  const liveStage = status === "IN_PROGRESS" || status === "DESIGNING" || (status === "PAID" && Boolean(state?.me.cameraReady));
   const live = useLiveVideo({
     sessionId,
     token: token ?? "",
     role: state?.me.role ?? "A",
-    enabled: Boolean(token) && !away && (state?.status === "IN_PROGRESS" || (state?.status === "PAID" && Boolean(state?.me.cameraReady))),
+    enabled: Boolean(token) && !away && liveStage,
+    paused: idle.state === "paused",
     stream: camera.liveStream,
     partnerSignal: state?.partnerSignal ?? null,
   });
@@ -63,10 +74,12 @@ export function BoothApp({ sessionId, justPaid, cancelled }: { sessionId: string
   if (!state) return <Shell><Loading /></Shell>;
 
   const myLink = ownLink(sessionId, token);
-  const leave = () => {
-    if (!window.confirm("Leave the photobooth? It stays saved — come back anytime with your private link.")) return;
+  const goAway = () => {
     camera.stop();
     setAway(true);
+  };
+  const leave = () => {
+    if (window.confirm("Leave the photobooth? It stays saved — come back anytime with your private link.")) goAway();
   };
 
   if (away) {
@@ -77,26 +90,40 @@ export function BoothApp({ sessionId, justPaid, cancelled }: { sessionId: string
     );
   }
 
-  const canLeave = state.status === "PAID" || state.status === "IN_PROGRESS";
+  const props: ScreenProps = { booth, state, camera, live, myLink, sessionId, token, justPaid, cancelled, onAway: goAway };
+  const partnerName = state.partner.name ?? "Your person";
+  const wide = isWide(state);
+  const canLeave = status === "PAID" || status === "IN_PROGRESS" || status === "DESIGNING";
+
   return (
-    <Shell onLeave={canLeave ? leave : undefined} offline={booth.offline}>
-      <InAppBrowserNotice
-        surpriseId={sessionId}
-        link={() => myLink}
-        message="The camera may not work in this built-in browser."
-      />
-      <Screen booth={booth} state={state} camera={camera} live={live} myLink={myLink} sessionId={sessionId} token={token} justPaid={justPaid} cancelled={cancelled} onAway={() => {
-        camera.stop();
-        setAway(true);
-      }} />
+    <Shell onLeave={canLeave ? leave : undefined} offline={booth.offline} wide={wide}>
+      <InAppBrowserNotice surpriseId={sessionId} link={() => myLink} message="The camera may not work in this built-in browser." />
+      {liveStage && idle.state !== "active" && <AwayPrompt state={idle.state} onHere={idle.resume} />}
+      {wide ? (
+        <Stage
+          left={status === "COMPLETED" ? null : <LivePreview state={state} />}
+          main={<Screen {...props} />}
+          right={
+            <BoothChat
+              sessionId={sessionId}
+              token={token}
+              messages={state.messages}
+              partnerName={partnerName}
+              onSent={() => void booth.refresh()}
+              className="h-full"
+            />
+          }
+        />
+      ) : (
+        <Screen {...props} />
+      )}
     </Shell>
   );
 }
 
 type Booth = ReturnType<typeof useBooth>;
 type Live = { status: LiveStatus; remote: MediaStream | null };
-
-function Screen(props: {
+type ScreenProps = {
   booth: Booth;
   state: BoothState;
   camera: Camera;
@@ -107,15 +134,26 @@ function Screen(props: {
   justPaid: boolean;
   cancelled: boolean;
   onAway: () => void;
-}) {
+};
+
+/** Screens that get the three-column stage (preview · main · chat). */
+function isWide(state: BoothState) {
+  if (state.status === "PAID") return Boolean(state.me.name && state.me.cameraReady);
+  return state.status === "IN_PROGRESS" || state.status === "DESIGNING" || state.status === "GENERATING" || state.status === "COMPLETED";
+}
+
+function Screen(props: ScreenProps) {
   const { state } = props;
   switch (state.status) {
     case "AWAITING_PAYMENT":
       return <PaymentScreen {...props} />;
     case "PAID":
+      if (!state.me.name) return <NameStep booth={props.booth} state={state} />;
       return <Lobby {...props} />;
     case "IN_PROGRESS":
       return <Rounds {...props} />;
+    case "DESIGNING":
+      return <DesignStep booth={props.booth} state={state} />;
     case "GENERATING":
       return <Generating />;
     case "FINALIZATION_FAILED":
@@ -127,9 +165,65 @@ function Screen(props: {
   }
 }
 
+/** Desktop: preview | main | chat. Phones: main first, then preview + chat side by side. */
+function Stage({ left, main, right }: { left: ReactNode; main: ReactNode; right: ReactNode }) {
+  return (
+    <div className={`grid gap-4 lg:items-start ${left ? "lg:grid-cols-[minmax(0,190px)_minmax(0,1fr)_minmax(0,320px)]" : "lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]"}`}>
+      <div className={`min-w-0 lg:row-start-1 ${left ? "lg:col-start-2" : "lg:col-start-1"}`}>{main}</div>
+      <div className={`grid gap-3 lg:contents ${left ? "grid-cols-[84px_minmax(0,1fr)] sm:grid-cols-[120px_minmax(0,1fr)]" : ""}`}>
+        {left && <aside className="min-w-0 lg:sticky lg:top-4 lg:col-start-1 lg:row-start-1">{left}</aside>}
+        <aside className={`h-[340px] min-w-0 lg:sticky lg:top-4 lg:row-start-1 lg:h-[min(640px,calc(100svh-7rem))] ${left ? "lg:col-start-3" : "lg:col-start-2"}`}>
+          {right}
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+/** The strip as it will look, filling in as photos are kept (and showing your pick while choosing). */
+function LivePreview({ state }: { state: BoothState }) {
+  const frame = getFrame(state.me.pick.frame ?? state.frameId) ?? getFrame(DEFAULT_FRAME_ID)!;
+  const filter: StripFilter = state.me.pick.filter ?? state.finalFilter ?? (frame.grayscale ? "bw" : "color");
+  return (
+    <div>
+      <StripPreview frame={frame} approved={state.approved} filter={filter} />
+      <p className="mt-2 text-center text-[11px] leading-tight text-ink-soft">
+        Your strip · {state.approved.length}/4
+      </p>
+    </div>
+  );
+}
+
+/** "Are you still there?" — and the paused state after no answer. */
+function AwayPrompt({ state, onHere }: { state: "asking" | "paused"; onHere: () => void }) {
+  return (
+    <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center px-4" role="dialog" aria-live="assertive">
+      <div className={`flex w-full max-w-md items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-cream shadow-2xl ${s.enter}`}>
+        <span className="text-xl" aria-hidden>
+          {state === "asking" ? "👀" : "⏸️"}
+        </span>
+        <p className="flex-1 text-sm">
+          {state === "asking" ? (
+            <>
+              <strong>Are you still there?</strong> We&rsquo;ll pause the video in a minute to save data.
+            </>
+          ) : (
+            <>
+              <strong>Video paused</strong> while you were away. Your photobooth is safe.
+            </>
+          )}
+        </p>
+        <button type="button" onClick={onHere} className="lw-press shrink-0 rounded-full bg-rose px-4 py-2 text-sm font-medium text-white hover:bg-rose-deep">
+          {state === "asking" ? "I'm here" : "Resume"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Payment (Person A only; Person B never pays) ───────────────────────────
 
-function PaymentScreen({ state, sessionId, token, justPaid, cancelled }: { state: BoothState; sessionId: string; token: string; justPaid: boolean; cancelled: boolean }) {
+function PaymentScreen({ state, sessionId, token, justPaid, cancelled }: ScreenProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (state.me.role === "B") {
@@ -179,10 +273,54 @@ function PaymentScreen({ state, sessionId, token, justPaid, cancelled }: { state
   );
 }
 
-// ─── Lobby: camera check → invite → design → 7-day notice → waiting ─────────
+// ─── Lobby: name → camera check → invite → 7-day notice → waiting ───────────
 
-function Lobby({ booth, state, camera, live, myLink, onAway }: { booth: Booth; state: BoothState; camera: Camera; live: Live; myLink: string; onAway: () => void }) {
+function NameStep({ booth, state }: { booth: Booth; state: BoothState }) {
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Card className="mx-auto max-w-md">
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!name.trim()) return;
+          setBusy(true);
+          setError(null);
+          try {
+            await booth.act("/lobby", { displayName: name.trim() });
+          } catch (err) {
+            setError(err instanceof ClientApiError ? err.message : "Something went wrong. Please try again.");
+            setBusy(false);
+          }
+        }}
+      >
+        <h1 className="font-display text-3xl">What should we call you?</h1>
+        <p className="mt-2 text-sm text-ink-soft">
+          {state.partner.name ? `${state.partner.name} will see this name.` : "Your person will see this name in the photobooth."}
+        </p>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={30}
+          autoFocus
+          autoComplete="given-name"
+          placeholder={state.me.role === "A" ? "e.g. Vinz" : "e.g. Samantha"}
+          aria-label="Your name"
+          className="mt-4 w-full rounded-2xl bg-white px-4 py-3.5 text-lg ring-1 ring-line focus:outline-none focus:ring-2 focus:ring-rose/40"
+        />
+        <Button type="submit" className="mt-4 w-full py-4" busy={busy} disabled={!name.trim()}>
+          Continue
+        </Button>
+        {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
+      </form>
+    </Card>
+  );
+}
+
+function Lobby({ booth, state, camera, live, myLink, onAway }: ScreenProps) {
   const { me, partner } = state;
+  const partnerName = partner.name ?? "your person";
   const [busy, setBusy] = useState(false);
   const [agree, setAgree] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -216,15 +354,15 @@ function Lobby({ booth, state, camera, live, myLink, onAway }: { booth: Booth; s
     }
   };
 
-  // Step 1 — camera check (after payment, before anything else).
+  // Camera check (after payment, before anything else).
   if (!me.cameraReady) {
     if (camera.status === "error" && camera.issue) {
-      return <CameraTrouble paid={state.me.role === "A"} issue={camera.issue} onRetry={retryCamera} retrying={false} myLink={myLink} onLater={onAway} />;
+      return <CameraTrouble paid={me.role === "A"} issue={camera.issue} onRetry={retryCamera} retrying={false} myLink={myLink} onLater={onAway} />;
     }
     return (
-      <div className="space-y-5">
+      <div className="mx-auto max-w-md space-y-5">
         <div className="text-center">
-          <h1 className="font-display text-3xl">Let&rsquo;s make sure your camera works.</h1>
+          <h1 className="font-display text-3xl">Hi {me.name}! Let&rsquo;s make sure your camera works.</h1>
           <p className="mt-2 text-ink-soft">
             {me.role === "A" ? "We'll check your camera before you invite your person." : "A quick check before your photobooth starts."}
           </p>
@@ -249,52 +387,29 @@ function Lobby({ booth, state, camera, live, myLink, onAway }: { booth: Booth; s
     );
   }
 
-  const frameId = state.frameId ?? DEFAULT_FRAME_ID;
   const waitingFor = !partner.joined
-    ? "Waiting for your person…"
-    : !partner.cameraReady
-      ? "Waiting for them to enable their camera…"
-      : !partner.acknowledged
-        ? "Waiting for them to read the photo notice…"
-        : "Your person is ready ❤️";
+    ? `Waiting for ${partnerName}…`
+    : !partner.name
+      ? "They're opening the photobooth…"
+      : !partner.cameraReady
+        ? `Waiting for ${partnerName} to enable their camera…`
+        : !partner.acknowledged
+          ? `Waiting for ${partnerName} to read the photo notice…`
+          : `${partner.name} is ready ❤️`;
 
   return (
     <div className="space-y-4">
       {camera.status === "error" && camera.issue ? (
-        <CameraTrouble paid={state.me.role === "A"} issue={camera.issue} onRetry={retryCamera} retrying={false} myLink={myLink} onLater={onAway} />
+        <CameraTrouble paid={me.role === "A"} issue={camera.issue} onRetry={retryCamera} retrying={false} myLink={myLink} onLater={onAway} />
       ) : (
-        <SplitView camera={camera} role={me.role} live={live} />
+        <SplitView camera={camera} role={me.role} live={live} partnerName={partner.name ?? "Your person"} />
       )}
 
       <Card>
         <PartnerStatus partner={partner} waitingFor={waitingFor} />
       </Card>
 
-      {me.role === "A" && state.inviteLink && <InviteCard link={state.inviteLink} joined={partner.joined} />}
-
-      <Card>
-        <h2 className="font-display text-xl">Choose your photobooth</h2>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {FRAMES.map((f) => {
-            const selected = f.id === frameId;
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => {
-                  if (state.frameId !== f.id) void send({ frameId: f.id });
-                }}
-                aria-pressed={selected}
-                className={`rounded-2xl bg-white p-3 text-left transition ${selected ? "ring-2 ring-rose" : "ring-1 ring-line hover:ring-ink/30"}`}
-              >
-                <img src={f.preview} alt="" className="mx-auto h-44 w-auto rounded-md shadow-md" />
-                <span className="mt-2 block text-sm font-medium">{f.name}</span>
-                <span className="block text-xs text-ink-soft">{selected ? "Selected ✓" : f.description}</span>
-              </button>
-            );
-          })}
-        </div>
-      </Card>
+      {me.role === "A" && state.inviteLink && <InviteCard link={state.inviteLink} joined={partner.joined} myName={me.name} />}
 
       <Card>
         <h2 className="font-display text-xl">Your photos are temporary.</h2>
@@ -312,7 +427,7 @@ function Lobby({ booth, state, camera, live, myLink, onAway }: { booth: Booth; s
               <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-rose" />
               <span>I understand that my photos will be deleted after {PHOTOBOOTH_RETENTION_DAYS} days.</span>
             </label>
-            <Button className="mt-3 w-full" disabled={!agree} busy={busy} onClick={() => void send({ acknowledge: true, ...(state.frameId ? {} : { frameId }) })}>
+            <Button className="mt-3 w-full" disabled={!agree} busy={busy} onClick={() => void send({ acknowledge: true, ...(state.frameId ? {} : { frameId: DEFAULT_FRAME_ID }) })}>
               Continue
             </Button>
           </>
@@ -324,7 +439,7 @@ function Lobby({ booth, state, camera, live, myLink, onAway }: { booth: Booth; s
   );
 }
 
-function InviteCard({ link, joined }: { link: string; joined: boolean }) {
+function InviteCard({ link, joined, myName }: { link: string; joined: boolean; myName: string | null }) {
   const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
   return (
     <Card className="bg-[linear-gradient(135deg,#fbe9ec,#fffdfa)] ring-blush">
@@ -337,7 +452,11 @@ function InviteCard({ link, joined }: { link: string; joined: boolean }) {
         {canShare && (
           <button
             type="button"
-            onClick={() => void navigator.share({ title: "Our photobooth", text: "Join me in our little photobooth ❤️", url: link }).catch(() => undefined)}
+            onClick={() =>
+              void navigator
+                .share({ title: "Our photobooth", text: `${myName ? `${myName} invited you to` : "Join me in"} our little photobooth ❤️`, url: link })
+                .catch(() => undefined)
+            }
             className="lw-press inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2.5 text-sm font-medium ring-1 ring-line hover:ring-ink/30"
           >
             <Icon.send size={15} /> Share
@@ -350,30 +469,19 @@ function InviteCard({ link, joined }: { link: string; joined: boolean }) {
 
 // ─── The four photos ────────────────────────────────────────────────────────
 
-function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }: { booth: Booth; state: BoothState; camera: Camera; live: Live; myLink: string; sessionId: string; token: string; onAway: () => void }) {
+function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }: ScreenProps) {
   const { me, partner, phase, attempt, round } = state;
+  const partnerName = partner.name ?? "Your person";
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const shotFor = useRef<number | null>(null);
 
-  const ready = async () => {
+  const act = async (path: string, body: unknown) => {
     setBusy(true);
     setError(null);
     try {
-      await booth.act("/ready", { attempt });
-    } catch (err) {
-      if (!(err instanceof ClientApiError && err.code === "BOOTH_STALE")) setError("Something went wrong. Please tap again.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const decide = async (decision: "KEEP" | "RETAKE") => {
-    setBusy(true);
-    setError(null);
-    try {
-      await booth.act("/decide", { attempt, decision });
+      await booth.act(path, body);
     } catch (err) {
       if (!(err instanceof ClientApiError && err.code === "BOOTH_STALE")) setError("Something went wrong. Please tap again.");
     } finally {
@@ -412,20 +520,19 @@ function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }
     void booth.refresh();
   }, [attempt, camera, sessionId, token, booth]);
 
-  const done = round - 1;
   const partnerAway = partner.joined && !partner.connected;
   const longAway = partnerAway && (partner.awayMs ?? 0) > RECONNECT_WINDOW_MS;
 
   return (
     <div className="space-y-4">
-      <Progress round={round} done={done} />
+      <Progress round={round} done={round - 1} />
 
       {state.notice && phase === "READY" && (
         <p className={`rounded-2xl bg-petal px-4 py-3 text-center text-sm ${s.enter}`}>
           {state.notice.kind === "aborted"
             ? "That one didn't go through — let's try again ❤️"
             : state.notice.by === "partner"
-              ? "Your person wants another take. Let's try that one again ❤️"
+              ? `${partnerName} wants another take. Let's try that one again ❤️`
               : "Let's try that one again ❤️"}
         </p>
       )}
@@ -434,40 +541,47 @@ function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }
         <Card className="text-center">
           <PartnerStatus partner={partner} />
           {longAway && (
-            <p className="mt-2 text-xs text-ink-soft">
-              They&rsquo;ve been away for a while. Your photobooth is saved — you can both come back later with your links.
-            </p>
+            <p className="mt-2 text-xs text-ink-soft">They&rsquo;ve been away for a while. Your photobooth is saved — you can both come back later with your links.</p>
           )}
         </Card>
       )}
 
-      {camera.status === "error" && camera.issue && <CameraTrouble paid={state.me.role === "A"} issue={camera.issue} onRetry={() => void camera.start()} retrying={false} myLink={myLink} onLater={onAway} />}
+      {camera.status === "error" && camera.issue && (
+        <CameraTrouble paid={me.role === "A"} issue={camera.issue} onRetry={() => void camera.start()} retrying={false} myLink={myLink} onLater={onAway} />
+      )}
 
       {phase === "REVIEW" && state.review ? (
         <Card className={s.enter}>
           <div className="grid grid-cols-2 gap-3">
-            <figure className="m-0">
-              <img src={state.review.mine} alt="Your photo" className="aspect-[3/4] w-full rounded-2xl object-cover shadow-md" />
-              <figcaption className="mt-1.5 text-center text-xs font-medium text-ink-soft">You</figcaption>
-            </figure>
-            <figure className="m-0">
-              <img src={state.review.theirs} alt="Your person's photo" className="aspect-[3/4] w-full rounded-2xl object-cover shadow-md" />
-              <figcaption className="mt-1.5 text-center text-xs font-medium text-ink-soft">Your person</figcaption>
-            </figure>
+            {(me.role === "A"
+              ? [
+                  { p: state.review.mine, who: "You" },
+                  { p: state.review.theirs, who: partnerName },
+                ]
+              : [
+                  { p: state.review.theirs, who: partnerName },
+                  { p: state.review.mine, who: "You" },
+                ]
+            ).map(({ p, who }) => (
+              <figure key={p.key} className="m-0">
+                <img src={stableUrl(p)} alt={`${who} — photo ${round}`} className="aspect-[3/4] w-full rounded-2xl object-cover shadow-md" />
+                <figcaption className="mt-1.5 text-center text-xs font-medium text-ink-soft">{who}</figcaption>
+              </figure>
+            ))}
           </div>
           {me.decision ? (
             <p className="mt-4 text-center text-sm text-ink-soft">
               {me.decision === "KEEP" ? "You kept this one ✓ " : ""}
-              {partner.decision ? "" : "Waiting for your person…"}
+              {partner.decision ? "" : `Waiting for ${partnerName}…`}
             </p>
           ) : (
             <>
               <p className="mt-4 text-center font-display text-xl">Do you like this one?</p>
               <div className="mt-3 grid grid-cols-2 gap-3">
-                <Button variant="secondary" className="py-4" disabled={busy} onClick={() => void decide("RETAKE")}>
+                <Button variant="secondary" className="py-4" disabled={busy} onClick={() => void act("/decide", { attempt, decision: "RETAKE" })}>
                   Retake
                 </Button>
-                <Button className="py-4" disabled={busy} onClick={() => void decide("KEEP")}>
+                <Button className="py-4" disabled={busy} onClick={() => void act("/decide", { attempt, decision: "KEEP" })}>
                   Keep ❤️
                 </Button>
               </div>
@@ -477,11 +591,11 @@ function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }
         </Card>
       ) : (
         <>
-          <SplitView camera={camera} role={me.role} live={live}>
+          <SplitView camera={camera} role={me.role} live={live} partnerName={partnerName}>
             {phase === "COUNTDOWN" && state.captureAt && !me.uploaded && <Countdown captureAt={state.captureAt} serverNow={booth.serverNow} onCapture={() => void onCapture()} />}
             {phase === "COUNTDOWN" && (me.uploaded || saving) && (
               <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-black/50 px-4 py-3 text-center text-sm text-white backdrop-blur">
-                {saving && !me.uploaded ? "Saving your photo…" : "Got it! Waiting for your person's photo…"}
+                {saving && !me.uploaded ? "Saving your photo…" : `Got it! Waiting for ${partnerName}'s photo…`}
               </div>
             )}
           </SplitView>
@@ -493,14 +607,14 @@ function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }
               <p className="text-center font-display text-xl">Get ready.</p>
               {me.ready ? (
                 <p className="rounded-full bg-white py-3 text-center text-sm font-medium ring-1 ring-line">
-                  {partner.ready ? "Here we go!" : "You're ready ✓ — waiting for your person…"}
+                  {partner.ready ? "Here we go!" : `You're ready ✓ — waiting for ${partnerName}…`}
                 </p>
               ) : (
-                <Button className="w-full py-4 text-base" busy={busy} disabled={camera.status !== "ready"} onClick={() => void ready()}>
+                <Button className="w-full py-4 text-base" busy={busy} disabled={camera.status !== "ready"} onClick={() => void act("/ready", { attempt })}>
                   I&rsquo;m Ready
                 </Button>
               )}
-              {!me.ready && partner.ready && <p className="text-center text-sm text-ink-soft">Your person is ready!</p>}
+              {!me.ready && partner.ready && <p className="text-center text-sm text-ink-soft">{partnerName} is ready!</p>}
             </div>
           )}
         </>
@@ -510,7 +624,130 @@ function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }
   );
 }
 
-// ─── After the fourth photo ─────────────────────────────────────────────────
+// ─── Choose the look (after the four photos) ────────────────────────────────
+
+const FILTERS: { id: StripFilter; label: string }[] = [
+  { id: "bw", label: "Black & white" },
+  { id: "color", label: "Color" },
+];
+
+function DesignStep({ booth, state }: { booth: Booth; state: BoothState }) {
+  const { me, partner } = state;
+  const partnerName = partner.name ?? "Your person";
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const frameId = me.pick.frame ?? DEFAULT_FRAME_ID;
+  const filter: StripFilter = me.pick.filter ?? "bw";
+  const frame = getFrame(frameId) ?? getFrame(DEFAULT_FRAME_ID)!;
+
+  const pick = async (next: { frameId?: string; filter?: StripFilter }, confirm = false) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await booth.act("/pick", { frameId: next.frameId ?? frameId, filter: next.filter ?? filter, confirm });
+    } catch (err) {
+      if (!(err instanceof ClientApiError && err.code === "BOOTH_STALE")) setError("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const same = partner.pick.frame === frameId && partner.pick.filter === filter;
+  const label = (f: string | null, fl: StripFilter | null) =>
+    `${FILTERS.find((x) => x.id === fl)?.label ?? "?"} · ${getFrame(f)?.name ?? "?"} frame`;
+  let statusLine: string;
+  if (me.pick.confirmed && partner.pick.confirmed && !same) {
+    statusLine = `You picked ${label(frameId, filter)}, ${partnerName} picked ${label(partner.pick.frame, partner.pick.filter)}. Choose the same look to make your strip — chat to decide!`;
+  } else if (me.pick.confirmed) {
+    statusLine = `Waiting for ${partnerName} to choose…`;
+  } else if (partner.pick.confirmed) {
+    statusLine = `${partnerName} chose ${label(partner.pick.frame, partner.pick.filter)}. Tap “Use this look” when you're happy.`;
+  } else {
+    statusLine = "Pick a filter and a frame. Your strip is made when you both choose the same look.";
+  }
+
+  const Badge = ({ mine, theirs }: { mine: boolean; theirs: boolean }) => (
+    <span className="mt-1.5 flex min-h-5 flex-wrap justify-center gap-1">
+      {mine && <span className="rounded-full bg-rose px-2 py-0.5 text-[10px] font-medium text-white">You</span>}
+      {theirs && <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-medium text-cream">{partnerName} picks this</span>}
+    </span>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="text-center">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-ink-soft">All four photos are in ❤️</p>
+        <h1 className="mt-1 font-display text-3xl">Make it yours</h1>
+      </div>
+
+      <div className="mx-auto w-40 lg:hidden">
+        <StripPreview frame={frame} approved={state.approved} filter={filter} />
+      </div>
+
+      <Card>
+        <h2 className="text-sm font-semibold">Filter</h2>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          {FILTERS.map((f) => {
+            const mine = f.id === filter;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                disabled={busy}
+                onClick={() => !mine && void pick({ filter: f.id })}
+                aria-pressed={mine}
+                className={`rounded-2xl bg-white p-3 text-center transition ${mine ? "ring-2 ring-rose" : "ring-1 ring-line hover:ring-ink/30"}`}
+              >
+                <span className={`mx-auto block h-14 w-full rounded-lg bg-[linear-gradient(135deg,#e85d84,#ffd36e,#6fb6e8)] ${f.id === "bw" ? "grayscale" : ""}`} />
+                <span className="mt-2 block text-sm font-medium">{f.label}</span>
+                <Badge mine={mine} theirs={partner.pick.filter === f.id} />
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      <Card>
+        <h2 className="text-sm font-semibold">Frame</h2>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          {FRAMES.map((f) => {
+            const mine = f.id === frameId;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                disabled={busy}
+                onClick={() => !mine && void pick({ frameId: f.id })}
+                aria-pressed={mine}
+                className={`rounded-2xl bg-white p-3 text-center transition ${mine ? "ring-2 ring-rose" : "ring-1 ring-line hover:ring-ink/30"}`}
+              >
+                <span className="mx-auto block h-14 w-9 rounded-sm ring-1 ring-black/10" style={{ background: f.background }} />
+                <span className="mt-2 block text-sm font-medium">{f.name}</span>
+                <Badge mine={mine} theirs={partner.pick.frame === f.id} />
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      <p className="text-center text-sm text-ink-soft" role="status">
+        {statusLine}
+      </p>
+      {me.pick.confirmed ? (
+        <p className="rounded-full bg-white py-3 text-center text-sm font-medium ring-1 ring-line">
+          You chose {label(frameId, filter)} ✓ <span className="text-ink-soft">— change it above anytime</span>
+        </p>
+      ) : (
+        <Button className="w-full py-4 text-base" busy={busy} onClick={() => void pick({}, true)}>
+          Use this look
+        </Button>
+      )}
+      {error && <p role="alert" className="text-center text-sm text-danger">{error}</p>}
+    </div>
+  );
+}
+
+// ─── After choosing ─────────────────────────────────────────────────────────
 
 function Generating() {
   return (
@@ -554,12 +791,14 @@ function Result({ state }: { state: BoothState }) {
   const result = state.result;
   if (!result) return <Ended />;
   const until = new Intl.DateTimeFormat("en-US", { dateStyle: "long", timeZone: PHOTOBOOTH_TIMEZONE }).format(new Date(result.expiresAt));
+  const names = state.me.name && state.partner.name ? (state.me.role === "A" ? `${state.me.name} & ${state.partner.name}` : `${state.partner.name} & ${state.me.name}`) : null;
   return (
     <div className="space-y-6 text-center">
       <div>
         <h1 className="font-display text-3xl sm:text-4xl">
           You made a little memory together. <HeartIcon size={24} className="inline text-rose" />
         </h1>
+        {names && <p className="mt-2 text-ink-soft">{names}</p>}
       </div>
       <img src={result.strip.url} alt="Your photobooth strip" className={`mx-auto w-full max-w-[17rem] rounded-sm shadow-[0_30px_60px_-25px_rgba(0,0,0,0.6)] ${s.strip}`} />
       <div className="mx-auto max-w-sm space-y-2">
@@ -574,18 +813,14 @@ function Result({ state }: { state: BoothState }) {
           {result.photos.map((p) => (
             <a key={p.round} href={p.download} className="group block rounded-xl bg-white p-1.5 text-sm ring-1 ring-line hover:ring-rose">
               <img src={p.url} alt={`Photo ${p.round}`} className="aspect-[3/2] w-full rounded-lg object-cover" loading="lazy" />
-              <span className="mt-1 flex items-center justify-center gap-1 text-xs font-medium text-ink-soft group-hover:text-rose">
-                Photo {p.round} · Download
-              </span>
+              <span className="mt-1 flex items-center justify-center gap-1 text-xs font-medium text-ink-soft group-hover:text-rose">Photo {p.round} · Download</span>
             </a>
           ))}
         </div>
       </Card>
       <div className="rounded-2xl bg-ink px-5 py-4 text-cream">
         <p className="font-medium">Available until {until}</p>
-        <p className="mt-1 text-sm text-cream/75">
-          Your photos will be permanently deleted after this date. Downloading doesn&rsquo;t extend it — save them now.
-        </p>
+        <p className="mt-1 text-sm text-cream/75">Your photos will be permanently deleted after this date. Downloading doesn&rsquo;t extend it — save them now.</p>
       </div>
       <Link href="/photobooth" className="inline-block text-sm text-ink-soft underline underline-offset-4">
         Love, Written Photobooth
@@ -627,9 +862,7 @@ function NoLink() {
   return (
     <Card className="text-center">
       <p className="font-display text-2xl">Open your private link</p>
-      <p className="mt-2 text-ink-soft">
-        This photobooth opens with the private link you were sent. Open that exact link (it ends with a long code) on this device.
-      </p>
+      <p className="mt-2 text-ink-soft">This photobooth opens with the private link you were sent. Open that exact link (it ends with a long code) on this device.</p>
     </Card>
   );
 }
@@ -655,10 +888,11 @@ function Loading() {
   );
 }
 
-function Shell({ children, onLeave, offline }: { children: React.ReactNode; onLeave?: () => void; offline?: boolean }) {
+function Shell({ children, onLeave, offline, wide = false }: { children: ReactNode; onLeave?: () => void; offline?: boolean; wide?: boolean }) {
+  const width = wide ? "max-w-6xl" : "max-w-xl";
   return (
     <div className="min-h-svh bg-[radial-gradient(80%_50%_at_50%_0%,#f9e2e7,transparent_70%)]">
-      <header className="mx-auto flex h-16 max-w-xl items-center justify-between px-4">
+      <header className={`mx-auto flex h-16 items-center justify-between px-4 ${width}`}>
         <Logo className="text-lg" />
         {onLeave && (
           <button type="button" onClick={onLeave} className="rounded-full px-3 py-2 text-sm text-ink-soft hover:bg-white/70 hover:text-ink">
@@ -667,11 +901,11 @@ function Shell({ children, onLeave, offline }: { children: React.ReactNode; onLe
         )}
       </header>
       {offline && (
-        <p className="mx-auto mb-2 max-w-xl px-4 text-center text-xs text-ink-soft" role="status">
+        <p className={`mx-auto mb-2 px-4 text-center text-xs text-ink-soft ${width}`} role="status">
           Reconnecting… your photobooth is safe.
         </p>
       )}
-      <main className="mx-auto max-w-xl px-4 pb-16 pt-2">{children}</main>
+      <main className={`mx-auto px-4 pb-24 pt-2 ${width}`}>{children}</main>
     </div>
   );
 }

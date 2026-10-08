@@ -110,7 +110,8 @@ export default function PrivacyPage() {
               <li>
                 <strong>Photobooth:</strong> the live view is sent directly between you and your person (encrypted; when a direct
                 connection isn&rsquo;t possible it passes, still encrypted, through our video relay provider Cloudflare) and is never
-                recorded or stored. Only the photos you take are uploaded.
+                recorded or stored. Only the photos you take are uploaded. Your name and chat messages in the photobooth are
+                deleted together with the photos.
                 Photos and the photobooth strip are kept for 7 days after the session is completed, then deleted (we verify
                 it). Paid sessions that are never completed are deleted after 60 days without activity.
               </li>

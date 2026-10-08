@@ -37,6 +37,7 @@ COMPLETED ─(7 days)─▶ EXPIRED ─▶ photos deleted + verified ─▶ DELE
 | `AWAITING_PAYMENT` | self-serve, waiting for PayMongo | removed after 48 h if never paid |
 | `PAID` | paid; camera check / invite / design / notice | **yes** — camera problems never leave this state |
 | `IN_PROGRESS` | taking photos (`round_phase` = READY / COUNTDOWN / REVIEW) | yes — leave and come back anytime |
+| `DESIGNING` | all 4 kept; both choose filter + frame | yes |
 | `GENERATING` | all 4 approved; building the strip | retried automatically |
 | `FINALIZATION_FAILED` | strip failed 3× | "Try again" button + admin retry; no new payment |
 | `COMPLETED` | strip ready — **7-day clock starts here** (`completed_at` → `expires_at`) | — |
@@ -91,6 +92,27 @@ signal, and nothing is held up for anyone else.
 
 **Stuck countdown:** if a photo never arrives within 45 s of the shutter, the next state
 read restarts that photo (`pb_abort_stale`) and deletes the half-taken shot.
+
+## Names, chat, choosing the look, and away/idle
+
+- **Names:** the first thing each person does is type a name (≤ 30 chars, plain text,
+  `display_name`). The other person sees it everywhere ("Samantha is ready", tile labels).
+- **Chat** (`photobooth_messages`, migration 0007): available from the lobby to the end,
+  on the right (below on phones), with quick replies ("I'm ready! 📸"…). Messages go through
+  `POST /api/photobooth/<id>/chat` (rate-limited, idempotent per `clientId`) and arrive with
+  the Realtime nudge / polling. Deleted with the photos. No extra cost beyond tiny DB rows.
+- **Live strip preview** (left; below on phones): `StripPreview` draws the real frame config
+  with every photo both people kept, so it's exactly what the download will look like. Photo
+  links carry a stable key and the browser reuses the first link (`stable-url.ts`), so images
+  don't reload on every state read.
+- **Choosing the look (DESIGNING):** after photo 4 both pick a **filter** (black & white /
+  color) and a **frame** (Black / White). Each sees the other's pick ("Samantha picks this").
+  `pb_pick` makes the strip only when both have confirmed the SAME look; changing your pick
+  un-confirms it. The choice is stored as `frame_id` + `final_filter`.
+- **Away / idle:** no tap or key for 3 minutes → "Are you still there?"; no answer in 60 s,
+  or the page hidden for 20 s → the live video pauses (a `pause` signal tells the other side
+  to stop too: "Samantha paused their video") and polling slows to every 10 s. Any tap or
+  returning to the page resumes. Saves relay data and server requests.
 
 ## Live view (seeing each other)
 
@@ -186,7 +208,7 @@ Never logged: tokens, photos, camera data.
 
 ## Setup checklist
 
-1. Run `supabase/migrations/0005_photobooth.sql` and `0006_photobooth_live_video.sql` in the Supabase SQL editor.
+1. Run `supabase/migrations/0005_photobooth.sql`, `0006_photobooth_live_video.sql` and `0007_photobooth_names_chat_design.sql` in the Supabase SQL editor.
 1b. For the live view on mobile data: create a Cloudflare TURN key and set `CLOUDFLARE_TURN_KEY_ID` + `CLOUDFLARE_TURN_API_TOKEN`.
 2. (Optional) `PHOTOBOOTH_PRICE_CENTAVOS` in Vercel.
 3. Realtime is used automatically (Broadcast is on by default in Supabase). If you ever

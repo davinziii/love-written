@@ -14,7 +14,7 @@ export type BoothLoadError = { code: string; message: string };
  *   • a server-clock offset so both phones fire the shutter at the same moment
  * Each read also tells the server we're still here (presence).
  */
-export function useBooth(sessionId: string) {
+export function useBooth(sessionId: string, { slow = false }: { slow?: boolean } = {}) {
   // undefined while rendering on the server; null when this device has no link for it.
   const token = useSyncExternalStore(
     noSubscribe,
@@ -79,12 +79,13 @@ export function useBooth(sessionId: string) {
     if (!token || status === "COMPLETED" || status === "EXPIRED" || status === "DELETED") return;
     const base =
       status === "IN_PROGRESS" ? (phase === "COUNTDOWN" ? 1000 : 1500) : status === "GENERATING" ? 2000 : status === "AWAITING_PAYMENT" ? 4000 : 2500;
-    const every = live ? Math.min(base * 2, 5000) : base;
+    // Away (idle / paused): check rarely — saves requests while nobody is looking.
+    const every = slow ? 10_000 : live ? Math.min(base * 2, 5000) : base;
     const id = window.setInterval(() => {
       if (document.visibilityState === "visible") void refresh();
     }, every);
     return () => window.clearInterval(id);
-  }, [token, status, phase, live, refresh]);
+  }, [token, status, phase, live, slow, refresh]);
 
   // Back in the tab / back online → catch up at once.
   useEffect(() => {

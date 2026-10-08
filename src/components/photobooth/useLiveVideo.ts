@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { boothApi } from "@/lib/photobooth/client";
 import type { BoothRole, RtcSignal } from "@/lib/photobooth/types";
 
-export type LiveStatus = "off" | "connecting" | "connected" | "unavailable";
+/** "partner-paused": the other person paused their video (stepped away / saving data). */
+export type LiveStatus = "off" | "connecting" | "connected" | "unavailable" | "partner-paused";
 
 const PREVIEW_ENCODING = { maxBitrate: 700_000, scaleResolutionDownBy: 2 };
 const GATHER_TIMEOUT_MS = 4000;
@@ -64,8 +65,23 @@ class LiveLink {
     if (track && sender && sender.track !== track) void sender.replaceTrack(track).catch(() => undefined);
   }
 
+  /** Tell the other person we paused (no video flows until one of us starts again). */
+  announcePause() {
+    void this.api.send({ type: "pause", epoch: crypto.randomUUID() });
+  }
+
   handleSignal(signal: RtcSignal) {
     if (!this.active) return;
+    if (signal.type === "pause") {
+      // They stepped away: close the link so nothing is sent; their offer/request restarts it.
+      window.clearTimeout(this.timer);
+      this.pc?.close();
+      this.pc = null;
+      this.epoch = this.role === "B" ? null : this.epoch;
+      this.onRemote(null);
+      this.onStatus("partner-paused");
+      return;
+    }
     if (this.role === "A") {
       if (signal.type === "answer" && signal.epoch === this.epoch && this.pc?.signalingState === "have-local-offer") {
         void this.pc.setRemoteDescription({ type: "answer", sdp: signal.sdp ?? "" }).catch(() => this.failed());
@@ -192,6 +208,7 @@ export function useLiveVideo({
   token,
   role,
   enabled,
+  paused,
   stream,
   partnerSignal,
 }: {
@@ -199,6 +216,8 @@ export function useLiveVideo({
   token: string;
   role: BoothRole;
   enabled: boolean;
+  /** This person is away (idle / page hidden): stop sending and receiving video. */
+  paused: boolean;
   stream: MediaStream | null;
   partnerSignal: RtcSignal | null;
 }) {
@@ -222,7 +241,12 @@ export function useLiveVideo({
     [sessionId, token, role],
   );
 
-  const ready = supported && enabled && Boolean(stream);
+  const ready = supported && enabled && !paused && Boolean(stream);
+
+  // Pausing: let the other person know (once per pause), so their side stops trying too.
+  useEffect(() => {
+    if (supported && enabled && paused) link.announcePause();
+  }, [link, supported, enabled, paused]);
 
   useEffect(() => {
     link.setStream(stream);

@@ -62,7 +62,10 @@ export default async function PhotoboothDetailPage({ params }: Props) {
                 const online = isOnline(p?.last_seen_at ?? null);
                 return (
                   <div key={role} className="rounded-2xl bg-white p-4 text-sm ring-1 ring-black/[0.05]">
-                    <p className="font-medium">{role === "A" ? "Person A (paid)" : "Person B (invited)"}</p>
+                    <p className="font-medium">
+                      {role === "A" ? "Person A (paid)" : "Person B (invited)"}
+                      {p?.display_name ? ` · ${p.display_name}` : ""}
+                    </p>
                     {p ? (
                       <ul className="mt-2 space-y-1 text-ink-soft">
                         <li>Joined: {fmt(p.joined_at)}</li>

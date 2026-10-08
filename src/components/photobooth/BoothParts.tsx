@@ -42,15 +42,17 @@ export function SplitView({
   camera,
   role,
   live,
+  partnerName = "Your person",
   children,
 }: {
   camera: Camera;
   role: "A" | "B";
   live: { status: LiveStatus; remote: MediaStream | null };
+  partnerName?: string;
   children?: ReactNode;
 }) {
   const mine = <SelfTile key="me" attach={camera.attach} status={camera.status} />;
-  const theirs = <PartnerTile key="them" live={live} />;
+  const theirs = <PartnerTile key="them" live={live} name={partnerName} />;
   return (
     <div className={s.split}>
       {role === "A" ? [mine, theirs] : [theirs, mine]}
@@ -69,7 +71,7 @@ function SelfTile({ attach, status }: { attach: Camera["attach"]; status: Camera
   );
 }
 
-function PartnerTile({ live }: { live: { status: LiveStatus; remote: MediaStream | null } }) {
+function PartnerTile({ live, name }: { live: { status: LiveStatus; remote: MediaStream | null }; name: string }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const v = ref.current;
@@ -85,15 +87,19 @@ function PartnerTile({ live }: { live: { status: LiveStatus; remote: MediaStream
         <div className="absolute inset-0 grid place-items-center p-3 text-center text-xs leading-snug text-white/75">
           {live.status === "unavailable" ? (
             <span>Live view isn&rsquo;t available on this connection — you can still take photos together.</span>
+          ) : live.status === "partner-paused" ? (
+            <span>{name} paused their video — they may have stepped away. You can still chat.</span>
+          ) : live.status === "off" ? (
+            <span>Video paused</span>
           ) : (
             <span className="flex flex-col items-center gap-2">
               <span className={`h-2.5 w-2.5 rounded-full bg-white/70 ${s.pulse}`} />
-              Connecting to your person…
+              Connecting to {name}…
             </span>
           )}
         </div>
       )}
-      <span className={s.tileLabel}>Your person</span>
+      <span className={s.tileLabel}>{name}</span>
     </div>
   );
 }
@@ -123,17 +129,18 @@ const ISSUE_TEXT: Record<CameraIssue, string> = {
 
 /** "Your person" status line with a little live dot. */
 export function PartnerStatus({ partner, waitingFor }: { partner: BoothPersonState; waitingFor?: string }) {
+  const name = partner.name ?? "Your person";
   let dot = "bg-line";
-  let text = "Waiting for your person to open their link…";
+  let text = `Waiting for ${partner.name ?? "your person"} to open their link…`;
   if (partner.joined && !partner.connected) {
     dot = "bg-amber-400";
-    text = "Your person disconnected. We're waiting for them to come back.";
+    text = `${name} disconnected. We're waiting for them to come back.`;
   } else if (partner.connected && partner.cameraIssue) {
     dot = "bg-amber-400";
-    text = `Your person ${ISSUE_TEXT[partner.cameraIssue]}.`;
+    text = `${name} ${ISSUE_TEXT[partner.cameraIssue]}.`;
   } else if (partner.connected) {
     dot = "bg-emerald-500";
-    text = waitingFor ?? "Your person is here";
+    text = waitingFor ?? `${name} is here`;
   }
   return (
     <p className="flex items-center gap-2 text-sm text-ink-soft" role="status">

@@ -28,7 +28,7 @@ export interface PhotoboothFrame {
   slots: [PhotoSlot, PhotoSlot, PhotoSlot, PhotoSlot];
   /** Space between Person A's and Person B's photo inside a slot. */
   gutter: number;
-  /** Turn the photos black & white in the strip (the individual downloads stay in color). */
+  /** Default filter for this frame (true = black & white). People choose the filter after their photos. */
   grayscale: boolean;
   /** Overlay PNG under /public (transparent where photos show through), or null for none. */
   overlay: string | null;

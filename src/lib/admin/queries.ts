@@ -292,13 +292,13 @@ export interface AdminBooth {
   cleanup_error: string | null;
   generation_error: string | null;
   created_at: string;
-  photobooth_participants: { role: "A" | "B"; joined_at: string | null; last_seen_at: string | null; camera_ready_at: string | null; camera_issue: string | null; camera_issue_at: string | null; deletion_ack_at: string | null }[];
+  photobooth_participants: { role: "A" | "B"; display_name: string | null; joined_at: string | null; last_seen_at: string | null; camera_ready_at: string | null; camera_issue: string | null; camera_issue_at: string | null; deletion_ack_at: string | null }[];
   orders: { order_number: string; status: string; payment_method: string; customer_label: string | null; amount_centavos: number }[];
 }
 
 const BOOTH_COLUMNS = `id, status, payment_status, current_round, frame_id, price_centavos, paid_at, completed_at, expires_at,
   last_activity_at, cleanup_attempts, cleanup_error, generation_error, created_at,
-  photobooth_participants(role, joined_at, last_seen_at, camera_ready_at, camera_issue, camera_issue_at, deletion_ack_at),
+  photobooth_participants(role, display_name, joined_at, last_seen_at, camera_ready_at, camera_issue, camera_issue_at, deletion_ack_at),
   orders(order_number, status, payment_method, customer_label, amount_centavos)`;
 
 /** Returns null if the photobooth tables don't exist yet (migration 0005 not run). */

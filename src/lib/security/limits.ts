@@ -24,6 +24,7 @@ export const LIMITS = {
   boothAuthFail: { max: 30, windowSec: 600 }, // per IP — wrong/expired links
   boothAction: { max: 300, windowSec: 600 }, // per participant (ready, keep, lobby…)
   boothShot: { max: 60, windowSec: 600 }, // per photobooth (photo uploads)
+  boothChat: { max: 120, windowSec: 600 }, // per participant (chat messages)
 } as const;
 
 export type LimitName = keyof typeof LIMITS;

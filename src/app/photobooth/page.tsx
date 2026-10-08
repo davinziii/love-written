@@ -21,8 +21,8 @@ const STEPS = [
   { icon: Icon.send, title: "Invite your person", body: "They get their own private link — and join free." },
   { icon: Icon.monitor, title: "Open your cameras", body: "On your phones or laptops, wherever you both are." },
   { icon: Icon.clock, title: "Take 4 photos together", body: "A shared 3 · 2 · 1 countdown, so you click at the same moment." },
-  { icon: Icon.check, title: "Approve your favorites", body: "You both keep each photo — or retake it together." },
-  { icon: Icon.image, title: "Download your strip", body: "A real photobooth strip, plus all four photos." },
+  { icon: Icon.check, title: "Approve your favorites", body: "See each other live, chat, and keep each photo together — or retake it." },
+  { icon: Icon.image, title: "Pick your look & download", body: "Black & white or color, black or white frame — then your strip and all four photos." },
 ];
 
 export default function PhotoboothPage() {

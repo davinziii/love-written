@@ -14,6 +14,8 @@ const body = z
     /** Must be literally true: the 7-day deletion notice was read and ticked. */
     acknowledge: z.boolean().optional(),
     frameId: z.string().min(1).max(64).optional(),
+    /** What the other person sees you as. */
+    displayName: z.string().max(60).optional(),
   })
   .strict();
 

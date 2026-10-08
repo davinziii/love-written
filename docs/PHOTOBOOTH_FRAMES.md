@@ -68,7 +68,7 @@ Properties with units set to pixels.
 - What people see in "Choose your photobooth" (and the landing page shows the default one).
 - About **400 px wide**, same 1 : 3 ratio, with sample photos inside so it looks finished.
 - Tip: run the project's builder as an example of how ours is made:
-  `node scripts/photobooth/build-black-white.mjs`.
+  `node scripts/photobooth/build-frames.mjs` (builds the Black and White frames).
 
 ## 6. Write `config.ts`
 
@@ -92,7 +92,7 @@ const frame: PhotoboothFrame = {
     { ...SLOT, y: 2340 },             // photo 4
   ],
   gutter: 20,                         // space between Person A and Person B inside a slot
-  grayscale: false,                   // true = photos turn black & white in the strip
+  grayscale: false,                   // default filter (people pick B&W or color after their photos)
   overlay: "/photobooth/frames/my-new-frame/frame.png",   // or null for no overlay
   preview: "/photobooth/frames/my-new-frame/preview.png",
 };
@@ -100,8 +100,9 @@ const frame: PhotoboothFrame = {
 export default frame;
 ```
 
-`grayscale` only affects the strip — the live camera stays in colour, and the four
-individual photo downloads stay in colour.
+People choose **black & white or color** themselves after their photos (and which frame);
+`grayscale` is just the default shown before they choose. The live camera and the four
+individual photo downloads always stay in colour.
 
 ## 7. Register it (the only code change)
 
@@ -130,8 +131,8 @@ On the server, after photo 4 is approved by both people (`composeStrip` in
 
 1. Start a blank `width × height` canvas filled with `background`.
 2. For each slot `n`: take photo `n` from Person A and from Person B, crop each to its window
-   (`(width − gutter) / 2 × height`), apply grayscale if `grayscale: true`, and place them
-   left / right.
+   (`(width − gutter) / 2 × height`), apply grayscale if they chose black & white, and place
+   them left / right.
 3. Put `frame.png` on top.
 4. Save as JPEG → that's the downloadable strip (kept 7 days, like the photos).
 

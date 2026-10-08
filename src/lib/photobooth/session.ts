@@ -9,7 +9,7 @@ import { checkRateLimit } from "@/lib/security/rate-limit";
 import { ipKey } from "@/lib/security/request";
 import { randomToken, sha256Hex } from "@/lib/security/tokens";
 import { openSecret, sealSecret } from "@/lib/security/access-vault";
-import { getObject, putObject, removeObjects, signedUrl } from "@/lib/media/storage";
+import { getObject, putObject, removeObjects, signedUrl, signedUrls } from "@/lib/media/storage";
 import type { PhotoboothParticipantRow, PhotoboothRoundRow, PhotoboothSessionRow } from "@/lib/db-types";
 import { DEFAULT_FRAME_ID, getFrame } from "@/photobooth/frames";
 import {
@@ -20,7 +20,7 @@ import {
   PHOTOBOOTH_ROUNDS,
   PRESENCE_TIMEOUT_MS,
 } from "./constants";
-import type { BoothPersonState, BoothRole, BoothState, CameraIssue, Decision } from "./types";
+import type { BoothPersonState, BoothRole, BoothState, CameraIssue, Decision, SignedPhoto, StripFilter } from "./types";
 import { composePair, composeStrip, processShot, type RoundPhotos } from "./images";
 import { nudge } from "./realtime";
 
@@ -121,7 +121,7 @@ export async function authorizeBooth(sessionId: string, req: Request, { claimDev
   // One device per link at a time while the photobooth is running. A new device can take over
   // once the old one goes quiet, so switching phones works — but a forwarded link can't join a
   // session in progress. Results (COMPLETED) can be opened on any number of devices.
-  const running = session.status === "PAID" || session.status === "IN_PROGRESS";
+  const running = liveViewOn(session.status);
   if (claimDevice && running && device && me.device_id && me.device_id !== device && me.last_seen_at) {
     if (Date.now() - new Date(me.last_seen_at).getTime() < DEVICE_TAKEOVER_MS) throw BoothErrors.inUse();
   }
@@ -168,6 +168,8 @@ function person(p: PhotoboothParticipantRow, s: PhotoboothSessionRow, round: Pho
   const seen = p.last_seen_at ? Date.now() - new Date(p.last_seen_at).getTime() : null;
   const isA = p.role === "A";
   return {
+    name: p.display_name,
+    pick: { frame: p.pick_frame, filter: p.pick_filter, confirmed: Boolean(p.pick_confirmed_at) },
     joined: Boolean(p.joined_at),
     connected: seen !== null && seen < PRESENCE_TIMEOUT_MS,
     awayMs: seen,
@@ -179,6 +181,10 @@ function person(p: PhotoboothParticipantRow, s: PhotoboothSessionRow, round: Pho
     decision: round ? (isA ? round.a_decision : round.b_decision) : null,
   };
 }
+
+/** The live view runs from the lobby through choosing the look. */
+export const liveViewOn = (status: string) => status === "PAID" || status === "IN_PROGRESS" || status === "DESIGNING";
+const MAX_CHAT_MESSAGES = 60;
 
 const isExpired = (s: PhotoboothSessionRow) => s.status === "COMPLETED" && s.expires_at !== null && new Date(s.expires_at).getTime() <= Date.now();
 
@@ -199,14 +205,36 @@ export async function buildState(ctx: BoothContext): Promise<BoothState> {
     else if (previous.status === "ABORTED") notice = { kind: "aborted" };
   }
 
-  let review: BoothState["review"] = null;
-  if (s.status === "IN_PROGRESS" && s.round_phase === "REVIEW" && current?.a_path && current.b_path) {
-    const [mine, theirs] = await Promise.all([
-      signedUrl(me.role === "A" ? current.a_path : current.b_path, { ttlSeconds: 900 }),
-      signedUrl(me.role === "A" ? current.b_path : current.a_path, { ttlSeconds: 900 }),
-    ]);
-    review = { mine, theirs };
-  }
+  // Photos for review and the live strip preview, signed in ONE storage call. Each has a
+  // stable key (its file name), so the browser keeps its first link and images never reload.
+  const live = s.status === "IN_PROGRESS" || s.status === "DESIGNING" || s.status === "GENERATING";
+  const { data: approvedRows } = live
+    ? await db().from("photobooth_rounds").select("round, a_path, b_path").eq("session_id", s.id).eq("status", "APPROVED").order("round")
+    : { data: [] };
+  const approvedList = ((approvedRows ?? []) as Pick<PhotoboothRoundRow, "round" | "a_path" | "b_path">[]).filter((r) => r.a_path && r.b_path);
+  const reviewing = s.status === "IN_PROGRESS" && s.round_phase === "REVIEW" && current?.a_path && current.b_path ? current : null;
+  const paths = [...approvedList.flatMap((r) => [r.a_path!, r.b_path!]), ...(reviewing ? [reviewing.a_path!, reviewing.b_path!] : [])];
+  const urls = paths.length ? await signedUrls(paths) : new Map<string, string>();
+  const photo = (path: string): SignedPhoto => ({ key: path.slice(path.lastIndexOf("/") + 1), url: urls.get(path) ?? "" });
+
+  const review: BoothState["review"] = reviewing
+    ? {
+        mine: photo(me.role === "A" ? reviewing.a_path! : reviewing.b_path!),
+        theirs: photo(me.role === "A" ? reviewing.b_path! : reviewing.a_path!),
+      }
+    : null;
+  const approved = approvedList.map((r) => ({ round: r.round, a: photo(r.a_path!), b: photo(r.b_path!) }));
+
+  // Chat: the latest messages (both people), oldest first.
+  const { data: messageRows } = await db()
+    .from("photobooth_messages")
+    .select("id, role, body, created_at")
+    .eq("session_id", s.id)
+    .order("id", { ascending: false })
+    .limit(MAX_CHAT_MESSAGES);
+  const messages = ((messageRows ?? []) as { id: number; role: string; body: string; created_at: string }[])
+    .reverse()
+    .map((m) => ({ id: m.id, mine: m.role === me.role, body: m.body, at: m.created_at }));
 
   const expired = isExpired(s);
   let result: BoothState["result"] = null;
@@ -241,9 +269,12 @@ export async function buildState(ctx: BoothContext): Promise<BoothState> {
     realtimeKey: s.realtime_key,
     me: { ...person(me, s, current), role: me.role },
     partner: person(partner, s, current),
-    partnerSignal: s.status === "PAID" || s.status === "IN_PROGRESS" ? (partner.rtc_signal ?? null) : null,
+    partnerSignal: liveViewOn(s.status) ? (partner.rtc_signal ?? null) : null,
     inviteLink: inviteToken ? participantLink(s.id, inviteToken) : null,
     review,
+    approved,
+    finalFilter: s.final_filter,
+    messages,
     result,
   };
 }
@@ -283,8 +314,20 @@ const one = <T>(data: unknown): T | undefined => (Array.isArray(data) ? data[0] 
 
 export async function lobbyUpdate(
   ctx: BoothContext,
-  input: { cameraReady?: boolean; cameraIssue?: CameraIssue | null; acknowledge?: boolean; frameId?: string },
+  input: { cameraReady?: boolean; cameraIssue?: CameraIssue | null; acknowledge?: boolean; frameId?: string; displayName?: string },
 ): Promise<void> {
+  if (input.displayName !== undefined) {
+    // Plain text only: trimmed, single line, no control characters (React escapes it on screen).
+    const name = input.displayName.replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim().slice(0, 30);
+    if (!name) throw Errors.badRequest("Please type your name.");
+    const { error } = await db().from("photobooth_participants").update({ display_name: name }).eq("id", ctx.me.id);
+    if (error) throw new Error(`save name: ${error.message}`);
+    log.info("photobooth_name_set", { sessionId: ctx.session.id, role: ctx.me.role });
+    if (Object.keys(input).length === 1) {
+      await nudge(ctx.session.realtime_key);
+      return;
+    }
+  }
   if (input.frameId !== undefined && !getFrame(input.frameId)) throw Errors.badRequest("That photobooth design isn't available.");
   if (input.acknowledge === false) throw Errors.badRequest("Please confirm you understand the 7-day deletion policy.");
   const { data, error } = await db().rpc("pb_lobby", {
@@ -355,10 +398,47 @@ export async function decide(ctx: BoothContext, attempt: number, decision: Decis
     log.info("photobooth_round_completed", meta);
   } else if (row.action === "COMPLETE") {
     log.info("photobooth_round_completed", meta);
-    after(() => finalizeBooth(s.id));
+    log.info("photobooth_designing_started", { sessionId: s.id });
   } else {
     log.info("photobooth_photo_approved", meta);
   }
+  await nudge(s.realtime_key);
+}
+
+/** Choose the strip's look. When both people confirm the same look, the strip is made. */
+export async function savePick(ctx: BoothContext, input: { frameId?: string; filter?: StripFilter; confirm: boolean }): Promise<void> {
+  if (input.frameId !== undefined && !getFrame(input.frameId)) throw Errors.badRequest("That design isn't available.");
+  if (input.confirm && (!input.frameId || !input.filter)) throw Errors.badRequest("Choose a filter and a frame first.");
+  const { data, error } = await db().rpc("pb_pick", {
+    p_session: ctx.session.id,
+    p_role: ctx.me.role,
+    p_frame: input.frameId ?? null,
+    p_filter: input.filter ?? null,
+    p_confirm: input.confirm,
+  });
+  if (error) throw new Error(`pb_pick: ${error.message}`);
+  const row = one<{ ok: boolean; started: boolean }>(data);
+  if (!row?.ok) throw BoothErrors.stale();
+  if (row.started) {
+    log.info("photobooth_look_chosen", { sessionId: ctx.session.id, frameId: input.frameId, filter: input.filter });
+    after(() => finalizeBooth(ctx.session.id));
+  }
+  await nudge(ctx.session.realtime_key);
+}
+
+/** A chat message to the other person. Retries with the same clientId are stored once. */
+export async function sendMessage(ctx: BoothContext, body: string, clientId: string): Promise<void> {
+  const s = ctx.session;
+  if (s.status === "AWAITING_PAYMENT" || s.status === "EXPIRED" || s.status === "CLEANUP_FAILED" || isExpired(s)) {
+    throw Errors.conflict("BOOTH_STALE", "Chat isn't available right now.");
+  }
+  const text = body.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "").trim().slice(0, 300);
+  if (!text) throw Errors.badRequest();
+  if (!(await checkRateLimit("boothChat", ctx.me.id))) throw Errors.rateLimited();
+  const { error } = await db()
+    .from("photobooth_messages")
+    .upsert({ session_id: s.id, role: ctx.me.role, body: text, client_id: clientId }, { onConflict: "session_id,client_id", ignoreDuplicates: true });
+  if (error) throw new Error(`send message: ${error.message}`);
   await nudge(s.realtime_key);
 }
 
@@ -395,7 +475,8 @@ export async function finalizeBooth(sessionId: string): Promise<void> {
       approved.map(async (r) => ({ round: r.round, a: await getObject(r.a_path!), b: await getObject(r.b_path!) })),
     );
     const frame = getFrame(session.frame_id) ?? getFrame(DEFAULT_FRAME_ID)!;
-    const [strip, ...pairs] = await Promise.all([composeStrip(frame, photos), ...photos.map((p) => composePair(p))]);
+    const grayscale = session.final_filter ? session.final_filter === "bw" : frame.grayscale;
+    const [strip, ...pairs] = await Promise.all([composeStrip(frame, photos, { grayscale }), ...photos.map((p) => composePair(p))]);
     await Promise.all([
       putObject(stripPath(sessionId), strip, "image/jpeg", { upsert: true }),
       ...pairs.map((buf, i) => putObject(pairPath(sessionId, i + 1), buf, "image/jpeg", { upsert: true })),

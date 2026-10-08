@@ -16,8 +16,8 @@ const SLOT = { x: 60, width: 1080, height: 720 } as const;
 
 const frame: PhotoboothFrame = {
   id: "black-white",
-  name: "Black & White",
-  description: "The classic strip — four moments in black and white.",
+  name: "Black",
+  description: "Black paper, light lettering — the classic strip.",
   width: 1200,
   height: 3600,
   background: "#0b0b0b",

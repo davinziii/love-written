@@ -150,6 +150,7 @@ export interface PhotoboothSessionRow {
   round_phase: import("@/lib/photobooth/types").RoundPhase | null;
   capture_at: string | null;
   realtime_key: string;
+  final_filter: "bw" | "color" | null;
   output_path: string | null;
   generation_claimed_at: string | null;
   generation_attempts: number;
@@ -182,6 +183,10 @@ export interface PhotoboothParticipantRow {
   deletion_ack_at: string | null;
   ready_attempt: number | null;
   rtc_signal: import("@/lib/photobooth/types").RtcSignal | null;
+  display_name: string | null;
+  pick_frame: string | null;
+  pick_filter: "bw" | "color" | null;
+  pick_confirmed_at: string | null;
   created_at: string;
   updated_at: string;
 }

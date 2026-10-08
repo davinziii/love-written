@@ -4,6 +4,7 @@ export type BoothStatus =
   | "AWAITING_PAYMENT"
   | "PAID"
   | "IN_PROGRESS"
+  | "DESIGNING"
   | "GENERATING"
   | "FINALIZATION_FAILED"
   | "COMPLETED"
@@ -15,16 +16,35 @@ export type BoothRole = "A" | "B";
 export type RoundPhase = "READY" | "COUNTDOWN" | "REVIEW";
 export type Decision = "KEEP" | "RETAKE";
 export type CameraIssue = "denied" | "unavailable" | "in_use" | "unsupported" | "other";
+export type StripFilter = "bw" | "color";
+
+/** A private photo link plus a stable key — the browser keeps the first link per key so images don't reload. */
+export interface SignedPhoto {
+  key: string;
+  url: string;
+}
+
+export interface ChatMessage {
+  id: number;
+  mine: boolean;
+  body: string;
+  at: string;
+}
 
 /** Live-view connection details passed once between the two browsers (A offers, B answers). */
 export interface RtcSignal {
-  type: "offer" | "answer" | "request";
+  /** "pause": this person paused their video (away / saving data). */
+  type: "offer" | "answer" | "request" | "pause";
   sdp?: string;
   /** Pairs an answer with its offer; a new value means "start over". */
   epoch: string;
 }
 
 export interface BoothPersonState {
+  /** The name they typed when they opened their link. */
+  name: string | null;
+  /** Their pick for the strip's look (after the photos). */
+  pick: { frame: string | null; filter: StripFilter | null; confirmed: boolean };
   joined: boolean;
   connected: boolean;
   /** ms since we last heard from them (null = never). */
@@ -58,7 +78,12 @@ export interface BoothState {
   partnerSignal: RtcSignal | null;
   /** Person A only: the invite link for Person B. */
   inviteLink: string | null;
-  review: { mine: string; theirs: string } | null;
+  review: { mine: SignedPhoto; theirs: SignedPhoto } | null;
+  /** Approved photos so far (for the live strip preview): Person A's and B's per photo number. */
+  approved: { round: number; a: SignedPhoto; b: SignedPhoto }[];
+  /** The chosen filter once the strip is being made. */
+  finalFilter: StripFilter | null;
+  messages: ChatMessage[];
   result: {
     strip: { url: string; download: string };
     photos: { round: number; url: string; download: string }[];
