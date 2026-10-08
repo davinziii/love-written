@@ -47,7 +47,7 @@ export function IssuedAccessCard({ access, saved = false }: { access: IssuedAcce
   );
 }
 
-function CopyRow({ label, value, mono, multiline }: { label: string; value: string; mono?: boolean; multiline?: boolean }) {
+export function CopyRow({ label, value, mono, multiline }: { label: string; value: string; mono?: boolean; multiline?: boolean }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="rounded-2xl bg-white p-3 ring-1 ring-black/[0.05]">

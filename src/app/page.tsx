@@ -6,7 +6,8 @@ import { HeartIcon, Icon } from "@/components/ui/icons";
 import { Reveal, PauseOffscreen } from "@/components/motion/Motion";
 import { AnimatedHeadline, Eyebrow, FloatingHearts, GradientBlobs, Sparkle, TypedLine } from "@/components/landing/Decor";
 import { HeroDevices } from "@/components/landing/HeroDevices";
-import { MessageToOrderCTA, PickSurpriseCTA, ctaClasses } from "@/components/landing/OrderCTA";
+import { MessageToOrderCTA, PickSurpriseCTA } from "@/components/landing/OrderCTA";
+import { ctaClasses } from "@/components/landing/cta-classes";
 import { FAQ_TEASER, HOW_IT_WORKS } from "@/components/landing/content";
 import { SamplePreview } from "@/components/preview/SamplePreview";
 import { ourStoryDefinition } from "@/templates/our-story/definition";
@@ -14,6 +15,8 @@ import { THEMES } from "@/templates/styles";
 import { formatPeso } from "@/lib/format";
 import { priceCentavos } from "@/lib/price";
 import { isManualPayments } from "@/lib/payments/mode";
+import { photoboothPriceCentavos } from "@/lib/photobooth/price";
+import { PhotoboothVisual } from "@/components/photobooth/PhotoboothVisual";
 
 const PROMISES = [
   { icon: Icon.lock, title: "A private link", body: "Each surprise lives at its own long, unguessable link — not listed anywhere." },
@@ -32,6 +35,7 @@ const FAN = [
 export default function LandingPage() {
   const sample = ourStoryDefinition.sample;
   const price = formatPeso(priceCentavos());
+  const boothPrice = formatPeso(photoboothPriceCentavos());
 
   return (
     <>
@@ -201,6 +205,38 @@ export default function LandingPage() {
             </Reveal>
             <Reveal delay={120}>
               <SamplePreview templateId="our-story" defaultDevice="desktop" desktopHeight={500} phoneHeight={600} />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* ─── Photobooth ───────────────────────────────────────────── */}
+        <section className="relative isolate overflow-hidden border-y border-line/60 bg-[linear-gradient(180deg,#fffdfa,#f8eef0)] py-24">
+          <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-[1fr_1fr]">
+            <Reveal className="lg:order-2">
+              <Eyebrow icon={Icon.image}>New · Love, Written Photobooth</Eyebrow>
+              <h2 className="mt-5 font-display text-4xl tracking-tight sm:text-5xl">Take a photo together, even when you&rsquo;re apart.</h2>
+              <p className="mt-4 text-lg leading-relaxed text-ink-soft">
+                A private digital photobooth for two. Open your cameras, capture four moments together, and turn them into a photobooth strip
+                you can keep for 7 days.
+              </p>
+              <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-ink-soft">
+                <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-line">Two people</span>
+                <Icon.arrowRight size={14} className="text-rose" aria-hidden />
+                <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-line">Four photos</span>
+                <Icon.arrowRight size={14} className="text-rose" aria-hidden />
+                <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-line">One photobooth strip</span>
+              </div>
+              <div className="mt-8 flex flex-wrap items-center gap-5">
+                <Link href="/photobooth" className={ctaClasses.primary}>
+                  Try the Photobooth <Icon.arrowRight size={18} />
+                </Link>
+                <p>
+                  <span className="font-display text-3xl">{boothPrice}</span> <span className="text-ink-soft">/ session</span>
+                </p>
+              </div>
+            </Reveal>
+            <Reveal delay={120} className="lg:order-1">
+              <PhotoboothVisual />
             </Reveal>
           </div>
         </section>

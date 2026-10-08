@@ -29,15 +29,37 @@ export function SiteHeader() {
           <Link href="/surprises" className="hidden rounded-full px-3 py-2 text-ink-soft transition hover:bg-white/70 hover:text-ink md:inline-block">
             Templates
           </Link>
-          <Link href="/#how-it-works" className="hidden rounded-full px-3 py-2 text-ink-soft transition hover:bg-white/70 hover:text-ink md:inline-block">
+          <Link href="/photobooth" className="rounded-full px-3 py-2 text-ink-soft transition hover:bg-white/70 hover:text-ink">
+            Photobooth
+          </Link>
+          <Link href="/#how-it-works" className="hidden rounded-full px-3 py-2 text-ink-soft transition hover:bg-white/70 hover:text-ink lg:inline-block">
             How it works
           </Link>
-          <Link href="/faq" className="hidden rounded-full px-3 py-2 text-ink-soft transition hover:bg-white/70 hover:text-ink sm:inline-block">
+          <Link href="/faq" className="hidden rounded-full px-3 py-2 text-ink-soft transition hover:bg-white/70 hover:text-ink md:inline-block">
             FAQ
           </Link>
-          <Link href="/recover" className="rounded-full px-3 py-2 text-ink-soft transition hover:bg-white/70 hover:text-ink">
+          <Link href="/recover" className="hidden rounded-full px-3 py-2 text-ink-soft transition hover:bg-white/70 hover:text-ink md:inline-block">
             Find my surprise
           </Link>
+          {/* Phones: everything else in a small menu (no JavaScript needed). */}
+          <details className="group relative md:hidden">
+            <summary className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-full text-ink-soft hover:bg-white/70 hover:text-ink [&::-webkit-details-marker]:hidden" aria-label="Menu">
+              <Icon.menu size={20} />
+            </summary>
+            <div className="absolute right-0 top-11 z-40 w-56 rounded-2xl bg-paper p-2 shadow-[0_18px_40px_-12px_rgba(43,29,34,0.35)] ring-1 ring-line">
+              {[
+                { href: "/surprises", label: "Templates" },
+                { href: "/photobooth", label: "Photobooth" },
+                { href: "/#how-it-works", label: "How it works" },
+                { href: "/faq", label: "FAQ" },
+                { href: "/recover", label: "Find my surprise" },
+              ].map((l) => (
+                <Link key={l.href} href={l.href} className="block rounded-xl px-3 py-2.5 text-ink hover:bg-petal">
+                  {l.label}
+                </Link>
+              ))}
+            </div>
+          </details>
           <Link
             href="/surprises"
             className="lw-press ml-1 hidden items-center gap-1.5 rounded-full bg-ink px-4 py-2 font-medium text-cream hover:bg-rose sm:inline-flex"
@@ -90,6 +112,7 @@ export function SiteFooter() {
               </FooterLink>
             ))}
             <FooterLink href="/surprises">All templates</FooterLink>
+            <FooterLink href="/photobooth">Photobooth</FooterLink>
           </FooterColumn>
 
           <FooterColumn title="How it works">

@@ -6,11 +6,9 @@ import { Icon } from "@/components/ui/icons";
 import { ORDER_CONTACT, isManualPayments } from "@/lib/payments/mode";
 import { trackClient } from "@/lib/client/analytics";
 import type { ClientEvent } from "@/lib/analytics/events";
+import { ctaClasses } from "./cta-classes";
 
-const primary =
-  "lw-press inline-flex items-center justify-center gap-2 rounded-full bg-rose px-7 py-4 text-base font-medium text-white shadow-[0_16px_30px_-12px_rgba(196,72,106,0.75)] hover:bg-rose-deep hover:shadow-[0_20px_36px_-12px_rgba(196,72,106,0.85)]";
-const secondary =
-  "lw-press inline-flex items-center justify-center gap-2 rounded-full bg-white/80 px-6 py-4 text-base font-medium text-ink shadow-sm ring-1 ring-line backdrop-blur hover:ring-ink/30";
+const { primary, secondary } = ctaClasses;
 
 /** The main emotional CTA: "Pick a Surprise" with a small heart burst. */
 export function PickSurpriseCTA({ label = "Pick a Surprise", event = "pick_surprise_click" as ClientEvent }) {
@@ -52,4 +50,3 @@ export function MessageToOrderCTA({ templateName, variant = "primary" }: { templ
   );
 }
 
-export const ctaClasses = { primary, secondary };

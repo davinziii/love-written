@@ -11,6 +11,7 @@ export interface AttentionCounts {
   failedPublish: number;
   openReports: number;
   cleanupFailed: number;
+  photobooth?: number;
 }
 
 interface NavItem {
@@ -43,6 +44,7 @@ export function AdminShell({
     { href: "/admin/surprises", label: "Surprises", icon: "gift" },
     { href: "/admin/orders", label: "Orders", icon: "receipt" },
     { href: "/admin/templates", label: "Templates", icon: "layers" },
+    { href: "/admin/photobooth", label: "Photobooth", icon: "image", badge: attention.photobooth },
   ];
   const attentionNav: NavItem[] = [
     { href: "/admin/failed-publish", label: "Failed Publish", icon: "alert", badge: attention.failedPublish },
@@ -54,7 +56,7 @@ export function AdminShell({
     { href: "/admin/help", label: "Help", icon: "help" },
   ];
 
-  const total = attention.failedPublish + attention.openReports + attention.cleanupFailed;
+  const total = attention.failedPublish + attention.openReports + attention.cleanupFailed + (attention.photobooth ?? 0);
 
   const isActive = (href: string) => (href === "/admin" ? pathname === "/admin" : pathname.startsWith(href));
 
@@ -189,6 +191,7 @@ function Notifications({ attention, total }: { attention: AttentionCounts; total
     { href: "/admin/failed-publish", n: attention.failedPublish, text: "paid surprise(s) failed to publish" },
     { href: "/admin/reports", n: attention.openReports, text: "open customer report(s)" },
     { href: "/admin/cleanup", n: attention.cleanupFailed, text: "deletion(s) need a retry" },
+    { href: "/admin/photobooth?view=attention", n: attention.photobooth ?? 0, text: "photobooth(s) need attention" },
   ].filter((i) => i.n > 0);
 
   return (

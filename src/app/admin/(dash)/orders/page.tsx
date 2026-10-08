@@ -25,14 +25,16 @@ export default async function OrdersPage() {
           action={<PrimaryLink href="/admin/orders/new">Create Your First Surprise</PrimaryLink>}
         />
       ) : (
-        <Table head={["Order", "Customer", "Template", "Payment", "Amount", "Reference", "Surprise", "Created", ""]}>
+        <Table head={["Order", "Customer", "Product", "Payment", "Amount", "Reference", "Surprise", "Created", ""]}>
           {orders.map((o) => {
             const payment = o.payments[0];
             return (
               <tr key={o.id}>
                 <td className="px-4 py-3 font-mono text-xs">{o.order_number}</td>
                 <td className="px-4 py-3">{o.customer_label ?? <span className="text-ink-soft">—</span>}</td>
-                <td className="px-4 py-3 text-ink-soft">{getTemplate(o.surprises?.template_id ?? "")?.name ?? "—"}</td>
+                <td className="px-4 py-3 text-ink-soft">
+                  {o.photobooth_session_id ? "Photobooth" : (getTemplate(o.surprises?.template_id ?? "")?.name ?? "—")}
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
                     <Badge value={o.status} />
@@ -49,7 +51,7 @@ export default async function OrdersPage() {
                 <td className="px-4 py-3 text-ink-soft">{fmt(o.created_at)}</td>
                 <td className="px-4 py-3 text-right">
                   <Link
-                    href={`/admin/surprises/${o.surprise_id}`}
+                    href={o.photobooth_session_id ? `/admin/photobooth/${o.photobooth_session_id}` : `/admin/surprises/${o.surprise_id}`}
                     className="lw-press inline-flex items-center gap-1 rounded-full bg-soft px-3 py-1.5 text-xs font-medium hover:bg-petal hover:text-rose"
                   >
                     View <Icon.arrowRight size={13} />

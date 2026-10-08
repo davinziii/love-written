@@ -5,6 +5,7 @@ import type { SurpriseRow } from "@/lib/db-types";
 import { UNPUBLISHED_PAID_TTL_DAYS } from "@/lib/lifecycle";
 import { enqueueCleanup, processDueCleanupJobs } from "@/lib/cleanup";
 import { failStaleOperations, publishSurprise, type PublishResult } from "./publish";
+import { runPhotoboothMaintenance } from "@/lib/photobooth/cleanup";
 
 /**
  * Time-based transitions. Each runs both lazily (when a recipient opens the link) and
@@ -51,6 +52,9 @@ export interface MaintenanceSummary {
   idlePaidDeleted: number;
   cleanupSucceeded: number;
   cleanupFailed: number;
+  photoboothExpired?: number;
+  photoboothDeleted?: number;
+  photoboothCleanupFailed?: number;
 }
 
 export async function runMaintenance(): Promise<MaintenanceSummary> {
@@ -131,7 +135,18 @@ export async function runMaintenance(): Promise<MaintenanceSummary> {
     else summary.cleanupFailed++;
   }
 
-  // 5. Old rate-limit windows.
+  // 5. Photobooth: expire completed sessions after 7 days and delete their photos.
+  //    Isolated so a photobooth problem can never block surprise maintenance.
+  try {
+    const booth = await runPhotoboothMaintenance();
+    summary.photoboothExpired = booth.expired;
+    summary.photoboothDeleted = booth.deleted;
+    summary.photoboothCleanupFailed = booth.failed;
+  } catch (err) {
+    log.error("photobooth_maintenance_failed", { error: errorMessage(err) });
+  }
+
+  // 6. Old rate-limit windows.
   await db()
     .from("rate_limits")
     .delete()

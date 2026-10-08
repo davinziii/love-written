@@ -257,12 +257,66 @@ async function stageCount(stages: Stage[]): Promise<number> {
 }
 
 export async function attentionCounts() {
-  const [failedPublish, cleanupFailed, reports] = await Promise.all([
+  const [failedPublish, cleanupFailed, reports, photobooth] = await Promise.all([
     stageCount(["PUBLISH_FAILED"]),
     stageCount(["CLEANUP_FAILED"]),
     db().from("reports").select("id", { count: "exact", head: true }).eq("status", "OPEN"),
+    photoboothAttention(),
   ]);
-  return { failedPublish, cleanupFailed, openReports: reports.count ?? 0 };
+  return { failedPublish, cleanupFailed, openReports: reports.count ?? 0, photobooth };
+}
+
+/** Photobooths needing a person: strip generation or deletion failed. 0 until migration 0005 runs. */
+async function photoboothAttention(): Promise<number> {
+  const { count, error } = await db()
+    .from("photobooth_sessions")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["FINALIZATION_FAILED", "CLEANUP_FAILED"]);
+  return error ? 0 : (count ?? 0);
+}
+
+export type BoothListView = "all" | "active" | "completed" | "attention";
+
+export interface AdminBooth {
+  id: string;
+  status: string;
+  payment_status: string;
+  current_round: number;
+  frame_id: string | null;
+  price_centavos: number;
+  paid_at: string | null;
+  completed_at: string | null;
+  expires_at: string | null;
+  last_activity_at: string;
+  cleanup_attempts: number;
+  cleanup_error: string | null;
+  generation_error: string | null;
+  created_at: string;
+  photobooth_participants: { role: "A" | "B"; joined_at: string | null; last_seen_at: string | null; camera_ready_at: string | null; camera_issue: string | null; camera_issue_at: string | null; deletion_ack_at: string | null }[];
+  orders: { order_number: string; status: string; payment_method: string; customer_label: string | null; amount_centavos: number }[];
+}
+
+const BOOTH_COLUMNS = `id, status, payment_status, current_round, frame_id, price_centavos, paid_at, completed_at, expires_at,
+  last_activity_at, cleanup_attempts, cleanup_error, generation_error, created_at,
+  photobooth_participants(role, joined_at, last_seen_at, camera_ready_at, camera_issue, camera_issue_at, deletion_ack_at),
+  orders(order_number, status, payment_method, customer_label, amount_centavos)`;
+
+/** Returns null if the photobooth tables don't exist yet (migration 0005 not run). */
+export async function listBooths(view: BoothListView = "all", limit = 200): Promise<AdminBooth[] | null> {
+  let q = db().from("photobooth_sessions").select(BOOTH_COLUMNS).order("updated_at", { ascending: false }).limit(limit);
+  if (view === "active") q = q.in("status", ["PAID", "IN_PROGRESS", "GENERATING"]);
+  if (view === "completed") q = q.in("status", ["COMPLETED", "EXPIRED", "DELETED"]);
+  if (view === "attention") q = q.in("status", ["FINALIZATION_FAILED", "CLEANUP_FAILED"]);
+  else q = q.neq("status", "AWAITING_PAYMENT");
+  const { data, error } = await q;
+  if (error) return null;
+  return (data ?? []) as unknown as AdminBooth[];
+}
+
+export async function boothDetail(id: string): Promise<AdminBooth | null> {
+  const { data, error } = await db().from("photobooth_sessions").select(BOOTH_COLUMNS).eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data as unknown as AdminBooth | null;
 }
 
 export async function dashboardKpis() {

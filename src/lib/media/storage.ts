@@ -27,6 +27,37 @@ export async function putImage(path: string, buffer: Buffer): Promise<void> {
   if (error) throw new Error(`storage upload failed: ${error.message}`);
 }
 
+/** Store an object at a server-chosen path; overwriting makes retried uploads idempotent. */
+export async function putObject(path: string, buffer: Buffer, contentType: string, { upsert = false } = {}): Promise<void> {
+  const { error } = await mediaBucket().upload(path, buffer, { contentType, cacheControl: "3600", upsert });
+  if (error) throw new Error(`storage upload failed: ${error.message}`);
+}
+
+export async function getObject(path: string): Promise<Buffer> {
+  const { data, error } = await mediaBucket().download(path);
+  if (error || !data) throw new Error(`storage download failed: ${error?.message ?? "no data"}`);
+  return Buffer.from(await data.arrayBuffer());
+}
+
+/** All object paths directly inside a folder. */
+export async function listFolder(folder: string): Promise<string[]> {
+  const paths: string[] = [];
+  for (let offset = 0; ; offset += 100) {
+    const { data, error } = await mediaBucket().list(folder, { limit: 100, offset });
+    if (error) throw new Error(`storage list failed: ${error.message}`);
+    for (const obj of data) if (obj.id) paths.push(`${folder}/${obj.name}`);
+    if (data.length < 100) break;
+  }
+  return paths;
+}
+
+/** A short-lived private link; with `download` the browser saves it under that file name. */
+export async function signedUrl(path: string, { ttlSeconds = SIGNED_URL_TTL_SECONDS, download }: { ttlSeconds?: number; download?: string } = {}): Promise<string> {
+  const { data, error } = await mediaBucket().createSignedUrl(path, ttlSeconds, download ? { download } : undefined);
+  if (error || !data?.signedUrl) throw new Error(`signing failed: ${error?.message ?? "no url"}`);
+  return data.signedUrl;
+}
+
 export async function removeObjects(paths: string[]): Promise<void> {
   if (paths.length === 0) return;
   const { error } = await mediaBucket().remove(paths);

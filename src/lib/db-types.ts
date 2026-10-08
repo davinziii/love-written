@@ -46,7 +46,9 @@ export type OrderStatus = "AWAITING_PAYMENT" | "PAID" | "PAYMENT_FAILED" | "EXPI
 export interface OrderRow {
   id: string;
   order_number: string;
-  surprise_id: string;
+  /** Exactly one of surprise_id / photobooth_session_id is set (one product per order). */
+  surprise_id: string | null;
+  photobooth_session_id: string | null;
   status: OrderStatus;
   amount_centavos: number;
   currency: string;
@@ -133,3 +135,66 @@ export interface CleanupJobRow {
 
 /** Postgres unique-violation error code. */
 export const UNIQUE_VIOLATION = "23505";
+
+// ─── Photobooth (supabase/migrations/0005_photobooth.sql) ───────────────────
+
+export interface PhotoboothSessionRow {
+  id: string;
+  status: import("@/lib/photobooth/types").BoothStatus;
+  payment_status: PaymentStatus;
+  price_centavos: number;
+  create_key: string | null;
+  frame_id: string | null;
+  current_round: number;
+  attempt: number;
+  round_phase: import("@/lib/photobooth/types").RoundPhase | null;
+  capture_at: string | null;
+  realtime_key: string;
+  output_path: string | null;
+  generation_claimed_at: string | null;
+  generation_attempts: number;
+  generation_error: string | null;
+  paid_at: string | null;
+  completed_at: string | null;
+  expires_at: string | null;
+  last_activity_at: string;
+  cleanup_reason: "expired" | "idle" | "unpaid" | "admin" | null;
+  cleanup_attempts: number;
+  cleanup_next_at: string | null;
+  cleanup_error: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PhotoboothParticipantRow {
+  id: string;
+  session_id: string;
+  role: "A" | "B";
+  token_hash: string;
+  token_enc: string | null;
+  device_id: string | null;
+  joined_at: string | null;
+  last_seen_at: string | null;
+  camera_ready_at: string | null;
+  camera_issue: import("@/lib/photobooth/types").CameraIssue | null;
+  camera_issue_at: string | null;
+  deletion_ack_at: string | null;
+  ready_attempt: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PhotoboothRoundRow {
+  session_id: string;
+  attempt: number;
+  round: number;
+  status: "CAPTURING" | "REVIEW" | "APPROVED" | "RETAKEN" | "ABORTED";
+  a_path: string | null;
+  b_path: string | null;
+  a_decision: "KEEP" | "RETAKE" | null;
+  b_decision: "KEEP" | "RETAKE" | null;
+  retake_by: "A" | "B" | null;
+  created_at: string;
+  updated_at: string;
+}

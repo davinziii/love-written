@@ -13,7 +13,16 @@ const noSubscribe = () => () => {};
  * suggests Chrome or Safari, and copies the full private link (with its access code) so
  * it works there too.
  */
-export function InAppBrowserNotice({ surpriseId }: { surpriseId: string }) {
+export function InAppBrowserNotice({
+  surpriseId,
+  link,
+  message = "Photo uploads can get interrupted here.",
+}: {
+  surpriseId: string;
+  /** The private link to copy (defaults to the studio link saved on this device). */
+  link?: () => string;
+  message?: string;
+}) {
   const app = useSyncExternalStore(
     noSubscribe,
     () => inAppBrowserName(navigator.userAgent),
@@ -30,6 +39,7 @@ export function InAppBrowserNotice({ surpriseId }: { surpriseId: string }) {
   if (!app || dismissed) return null;
 
   function privateLink(): string {
+    if (link) return link();
     const draft = getLocalDraft(surpriseId);
     if (!draft?.editToken) return window.location.href;
     const fragment = new URLSearchParams({ access: draft.editToken, ...(draft.recoveryCode ? { code: draft.recoveryCode } : {}) });
@@ -74,7 +84,7 @@ export function InAppBrowserNotice({ surpriseId }: { surpriseId: string }) {
         <div className="min-w-0 flex-1">
           <p className="font-medium">You&rsquo;re in {app}&rsquo;s built-in browser</p>
           <p className="mt-1 text-sm text-ink-soft">
-            Photo uploads can get interrupted here. For the smoothest experience, tap <strong>⋯</strong> →{" "}
+            {message} For the smoothest experience, tap <strong>⋯</strong> →{" "}
             <strong>Open in browser</strong>, or copy your private link and paste it into Chrome or Safari.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">

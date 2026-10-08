@@ -17,6 +17,7 @@ const schema = z.object({
   PAYMONGO_MODE: z.enum(["test", "live"]).default("test"),
   PAYMONGO_PAYMENT_METHODS: z.string().default("gcash,paymaya,qrph,card"),
   PRICE_CENTAVOS: z.coerce.number().int().positive().default(9900),
+  PHOTOBOOTH_PRICE_CENTAVOS: z.coerce.number().int().positive().default(5000),
   APP_HASH_PEPPER: z.string().min(24, "APP_HASH_PEPPER must be at least 24 characters"),
   CRON_SECRET: z.string().min(16),
   TURNSTILE_SECRET_KEY: z.string().optional(),

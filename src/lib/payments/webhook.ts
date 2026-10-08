@@ -6,6 +6,7 @@ import { track } from "@/lib/analytics/server";
 import { UNIQUE_VIOLATION, type OrderRow } from "@/lib/db-types";
 import { verifyPaymongoSignature } from "./signature";
 import { alert } from "@/lib/alerts";
+import { nudge } from "@/lib/photobooth/realtime";
 
 /**
  * PayMongo webhook processing — the ONLY place an order becomes PAID.
@@ -153,9 +154,9 @@ async function dispatch(type: string, resource: Json, eventId: string, livemode:
       // The checkout session stays open (they can try another method), so the order
       // remains AWAITING_PAYMENT; we only surface the failure to the customer.
       await db()
-        .from("surprises")
+        .from(order.photobooth_session_id ? "photobooth_sessions" : "surprises")
         .update({ payment_status: "PAYMENT_FAILED" })
-        .eq("id", order.surprise_id)
+        .eq("id", order.photobooth_session_id ?? order.surprise_id!)
         .eq("payment_status", "AWAITING_PAYMENT");
       log.info("payment_failed", { orderId: order.id, eventId });
       await track("payment_failed", { surpriseId: order.surprise_id });
@@ -223,11 +224,28 @@ async function markPaid(order: OrderRow, payment: PaymentInfo, sessionId: string
     throw new Error(`mark order paid: ${orderError.message}`);
   }
 
-  await db().from("surprises").update({ payment_status: "PAID" }).eq("id", order.surprise_id);
+  if (order.photobooth_session_id) {
+    // Photobooth: payment opens the session (camera check, invite…). The 7-day photo
+    // retention does NOT start here — only when the photobooth is completed.
+    const { error: boothError } = await db()
+      .from("photobooth_sessions")
+      .update({ payment_status: "PAID", status: "PAID", paid_at: payment.paidAt ?? new Date().toISOString(), last_activity_at: new Date().toISOString() })
+      .eq("id", order.photobooth_session_id)
+      .eq("status", "AWAITING_PAYMENT");
+    if (boothError) throw new Error(`mark photobooth paid: ${boothError.message}`);
+    if (updated && updated.length > 0) {
+      log.info("photobooth_payment_confirmed", { orderId: order.id, sessionId: order.photobooth_session_id, paymentId: payment.id });
+      const { data: booth } = await db().from("photobooth_sessions").select("realtime_key").eq("id", order.photobooth_session_id).maybeSingle();
+      if (booth?.realtime_key) await nudge(booth.realtime_key as string);
+    }
+    return;
+  }
+
+  await db().from("surprises").update({ payment_status: "PAID" }).eq("id", order.surprise_id!);
   await db()
     .from("surprises")
     .update({ stage: "READY_TO_PUBLISH" })
-    .eq("id", order.surprise_id)
+    .eq("id", order.surprise_id!)
     .in("stage", ["DRAFT", "CUSTOMIZING"]);
 
   if (updated && updated.length > 0) {

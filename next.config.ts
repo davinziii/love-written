@@ -15,7 +15,8 @@ const csp = [
   `img-src 'self' blob: data: ${supabaseOrigin}`,
   "media-src 'self'",
   "font-src 'self'",
-  `connect-src 'self' ${supabaseOrigin}`,
+  // wss: Supabase Realtime (photobooth sync nudges)
+  `connect-src 'self' ${supabaseOrigin} ${supabaseOrigin.replace(/^http/, "ws")}`,
   "frame-src https://challenges.cloudflare.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
@@ -26,6 +27,10 @@ const csp = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ["sharp"],
+  // Photobooth frame overlays are read from disk when the strip is generated.
+  outputFileTracingIncludes: {
+    "/api/photobooth/**": ["./public/photobooth/frames/**/*"],
+  },
   async headers() {
     return [
       {
@@ -43,6 +48,17 @@ const nextConfig: NextConfig = {
         // Private surprise pages: never indexed, cached, or leaked through the Referer header.
         source: "/s/:token*",
         headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+        ],
+      },
+      {
+        // Photobooth sessions: the only pages allowed to use the camera. Private links —
+        // never indexed, cached or sent as a Referer.
+        source: "/photobooth/s/:path*",
+        headers: [
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
           { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "Cache-Control", value: "private, no-store, max-age=0" },

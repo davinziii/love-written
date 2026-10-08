@@ -20,14 +20,16 @@ function key(): Buffer {
   return Buffer.from(hkdfSync("sha256", env().APP_HASH_PEPPER, "love-written", "edit-access-v1", 32));
 }
 
-export function sealAccess(editToken: string, recoveryCode: string): string {
+/** Encrypt a short secret (AES-256-GCM, authenticated). */
+export function sealSecret(plain: string): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key(), iv);
-  const body = Buffer.concat([cipher.update(JSON.stringify({ t: editToken, c: recoveryCode }), "utf8"), cipher.final(), cipher.getAuthTag()]);
+  const body = Buffer.concat([cipher.update(plain, "utf8"), cipher.final(), cipher.getAuthTag()]);
   return `${VERSION}.${iv.toString("base64url")}.${body.toString("base64url")}`;
 }
 
-export function openAccess(sealed: string | null | undefined): { editToken: string; recoveryCode: string } | null {
+/** Decrypt sealSecret() output; null if missing, tampered with or unreadable. */
+export function openSecret(sealed: string | null | undefined): string | null {
   if (!sealed) return null;
   const [version, ivPart, bodyPart] = sealed.split(".");
   if (version !== VERSION || !ivPart || !bodyPart) return null;
@@ -35,7 +37,20 @@ export function openAccess(sealed: string | null | undefined): { editToken: stri
     const body = Buffer.from(bodyPart, "base64url");
     const decipher = createDecipheriv("aes-256-gcm", key(), Buffer.from(ivPart, "base64url"));
     decipher.setAuthTag(body.subarray(body.length - 16));
-    const plain = Buffer.concat([decipher.update(body.subarray(0, body.length - 16)), decipher.final()]).toString("utf8");
+    return Buffer.concat([decipher.update(body.subarray(0, body.length - 16)), decipher.final()]).toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
+export function sealAccess(editToken: string, recoveryCode: string): string {
+  return sealSecret(JSON.stringify({ t: editToken, c: recoveryCode }));
+}
+
+export function openAccess(sealed: string | null | undefined): { editToken: string; recoveryCode: string } | null {
+  const plain = openSecret(sealed);
+  if (!plain) return null;
+  try {
     const parsed = JSON.parse(plain) as { t?: unknown; c?: unknown };
     return typeof parsed.t === "string" && typeof parsed.c === "string" ? { editToken: parsed.t, recoveryCode: parsed.c } : null;
   } catch {

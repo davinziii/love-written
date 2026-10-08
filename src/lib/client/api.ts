@@ -43,7 +43,8 @@ export async function api<T>(
     editToken,
     signal,
     retries = method === "GET" ? 2 : 0,
-  }: { method?: string; body?: unknown; editToken?: string; signal?: AbortSignal; retries?: number } = {},
+    headers: extraHeaders,
+  }: { method?: string; body?: unknown; editToken?: string; signal?: AbortSignal; retries?: number; headers?: Record<string, string> } = {},
 ): Promise<T> {
   let res: Response | undefined;
   for (let attempt = 0; !res; attempt++) {
@@ -55,6 +56,7 @@ export async function api<T>(
         headers: {
           ...(body !== undefined && !(body instanceof FormData) ? { "content-type": "application/json" } : {}),
           ...(editToken ? { "x-lw-edit-token": editToken } : {}),
+          ...extraHeaders,
         },
         body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
       });

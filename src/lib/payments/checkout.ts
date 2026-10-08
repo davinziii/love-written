@@ -83,9 +83,10 @@ export async function startCheckout(row: SurpriseRow, idempotencyKey: string): P
     session = await createCheckoutSession({
       orderId: order.id,
       orderNumber: order.order_number,
-      surpriseId: row.id,
       amountCentavos: amount,
-      templateName: template.name,
+      itemName: `Love, Written — ${template.name}`,
+      itemDescription: "Digital surprise, hosted for 30 days after it goes live",
+      metadata: { surprise_id: row.id },
       successUrl: `${site}/studio/${row.id}?step=payment`,
       cancelUrl: `${site}/studio/${row.id}?step=preview&payment=cancelled`,
     });

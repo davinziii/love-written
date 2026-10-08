@@ -1,0 +1,144 @@
+/* Photobooth — small, purposeful motion only (transform/opacity). */
+
+.camera {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.75rem;
+  background: #1c1517;
+  aspect-ratio: 3 / 4;
+  box-shadow: 0 30px 60px -30px rgb(43 29 34 / 0.55);
+}
+.video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Mirror the preview like a real mirror; the saved photo is not mirrored. */
+  transform: scaleX(-1);
+}
+
+.pulse {
+  animation: pulse 1.8s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+}
+
+.digit {
+  animation: digit 1s cubic-bezier(0.2, 1.2, 0.35, 1) both;
+}
+@keyframes digit {
+  0% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+.flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  pointer-events: none;
+  animation: flash 0.6s ease-out forwards;
+}
+@keyframes flash {
+  from {
+    opacity: 0.95;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.enter {
+  animation: enter 0.6s cubic-bezier(0.22, 0.8, 0.24, 1) both;
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.strip {
+  animation: strip 1.4s cubic-bezier(0.22, 0.8, 0.24, 1) both;
+}
+@keyframes strip {
+  from {
+    opacity: 0;
+    transform: translateY(-40px);
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse,
+  .digit,
+  .flash,
+  .enter,
+  .strip {
+    animation: none !important;
+  }
+  .flash {
+    display: none;
+  }
+}
+
+/* ── Marketing visual: two photos → one strip ── */
+.floatA {
+  animation: float 6s ease-in-out infinite;
+}
+.floatB {
+  animation: float 6s ease-in-out -3s infinite;
+}
+@keyframes float {
+  50% {
+    transform: translateY(-8px) rotate(var(--r, 0deg));
+  }
+}
+.stripIn {
+  animation: stripIn 1.6s cubic-bezier(0.22, 0.8, 0.24, 1) 0.3s both;
+}
+@keyframes stripIn {
+  from {
+    opacity: 0;
+    transform: translateY(-36px) rotate(-2deg);
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(2deg);
+    clip-path: inset(0 0 0 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .floatA,
+  .floatB,
+  .stripIn {
+    animation: none !important;
+  }
+}

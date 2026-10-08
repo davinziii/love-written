@@ -21,9 +21,12 @@ export interface CreatedCheckout {
 export async function createCheckoutSession(input: {
   orderId: string;
   orderNumber: string;
-  surpriseId: string;
   amountCentavos: number;
-  templateName: string;
+  /** Line item shown on the PayMongo page. */
+  itemName: string;
+  itemDescription: string;
+  /** Internal ids only (strings) — never customer content. */
+  metadata: Record<string, string>;
   successUrl: string;
   cancelUrl: string;
 }): Promise<CreatedCheckout> {
@@ -40,8 +43,8 @@ export async function createCheckoutSession(input: {
         attributes: {
           line_items: [
             {
-              name: `Love, Written — ${input.templateName}`,
-              description: "Digital surprise, hosted for 30 days after it goes live",
+              name: input.itemName,
+              description: input.itemDescription,
               amount: input.amountCentavos,
               currency: "PHP",
               quantity: 1,
@@ -55,7 +58,7 @@ export async function createCheckoutSession(input: {
           send_email_receipt: true,
           show_line_items: true,
           // Metadata values must be strings. Only internal ids — no customer content.
-          metadata: { order_id: input.orderId, surprise_id: input.surpriseId },
+          metadata: { order_id: input.orderId, ...input.metadata },
         },
       },
     }),

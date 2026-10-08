@@ -19,6 +19,11 @@ export const LIMITS = {
   contentReport: { max: 5, windowSec: 3600 }, // per IP
   contentReportPerSurprise: { max: 20, windowSec: 86400 }, // per surprise
   alertEmail: { max: 4, windowSec: 3600 }, // per alert kind (owner's inbox)
+  boothCreate: { max: 10, windowSec: 3600 }, // per IP
+  boothCheckout: { max: 10, windowSec: 600 }, // per photobooth
+  boothAuthFail: { max: 30, windowSec: 600 }, // per IP — wrong/expired links
+  boothAction: { max: 300, windowSec: 600 }, // per participant (ready, keep, lobby…)
+  boothShot: { max: 60, windowSec: 600 }, // per photobooth (photo uploads)
 } as const;
 
 export type LimitName = keyof typeof LIMITS;

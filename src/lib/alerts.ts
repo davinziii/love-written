@@ -19,7 +19,8 @@ export type AlertKind =
   | "duplicate_payment"
   | "webhook_failed"
   | "maintenance_failed"
-  | "server_error";
+  | "server_error"
+  | "photobooth_failed";
 
 const SUBJECTS: Record<AlertKind, string> = {
   publish_failed: "A paid surprise failed to publish",
@@ -30,6 +31,7 @@ const SUBJECTS: Record<AlertKind, string> = {
   webhook_failed: "Payment webhook processing failed",
   maintenance_failed: "Scheduled maintenance failed",
   server_error: "The website hit a server error",
+  photobooth_failed: "A paid photobooth needs your attention",
 };
 
 const ADMIN_PATH: Record<AlertKind, string> = {
@@ -41,6 +43,7 @@ const ADMIN_PATH: Record<AlertKind, string> = {
   webhook_failed: "/admin/orders",
   maintenance_failed: "/admin",
   server_error: "/admin",
+  photobooth_failed: "/admin/photobooth",
 };
 
 async function deliver(kind: AlertKind, details: Record<string, string | number | undefined>) {
