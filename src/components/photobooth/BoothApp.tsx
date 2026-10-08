@@ -16,7 +16,8 @@ import { formatPeso } from "@/lib/format";
 import { DEFAULT_FRAME_ID, FRAMES } from "@/photobooth/frames";
 import { useBooth } from "./useBooth";
 import { useCamera, type Camera } from "./useCamera";
-import { CameraTrouble, CameraView, Card, CopyButton, Countdown, PartnerStatus, Progress, SupportLine } from "./BoothParts";
+import { useLiveVideo, type LiveStatus } from "./useLiveVideo";
+import { CameraTrouble, CameraView, Card, CopyButton, Countdown, PartnerStatus, Progress, SplitView, SupportLine } from "./BoothParts";
 import s from "./photobooth.module.css";
 
 /**
@@ -38,6 +39,23 @@ export function BoothApp({ sessionId, justPaid, cancelled }: { sessionId: string
     if (autoStart && camStatus === "idle") void start();
     if (!needsCamera && camStatus === "ready") stop();
   }, [autoStart, needsCamera, camStatus, start, stop]);
+
+  // Live view: see each other for the whole session (once your camera works).
+  const live = useLiveVideo({
+    sessionId,
+    token: token ?? "",
+    role: state?.me.role ?? "A",
+    enabled: Boolean(token) && !away && (state?.status === "IN_PROGRESS" || (state?.status === "PAID" && Boolean(state?.me.cameraReady))),
+    stream: camera.liveStream,
+    partnerSignal: state?.partnerSignal ?? null,
+  });
+  // While the two browsers are finding each other, check for the other's reply more often.
+  const { refresh } = booth;
+  useEffect(() => {
+    if (live.status !== "connecting") return;
+    const id = window.setInterval(() => void refresh(), 1200);
+    return () => window.clearInterval(id);
+  }, [live.status, refresh]);
 
   if (token === undefined) return <Shell><Loading /></Shell>;
   if (token === null) return <Shell><NoLink /></Shell>;
@@ -67,7 +85,7 @@ export function BoothApp({ sessionId, justPaid, cancelled }: { sessionId: string
         link={() => myLink}
         message="The camera may not work in this built-in browser."
       />
-      <Screen booth={booth} state={state} camera={camera} myLink={myLink} sessionId={sessionId} token={token} justPaid={justPaid} cancelled={cancelled} onAway={() => {
+      <Screen booth={booth} state={state} camera={camera} live={live} myLink={myLink} sessionId={sessionId} token={token} justPaid={justPaid} cancelled={cancelled} onAway={() => {
         camera.stop();
         setAway(true);
       }} />
@@ -76,11 +94,13 @@ export function BoothApp({ sessionId, justPaid, cancelled }: { sessionId: string
 }
 
 type Booth = ReturnType<typeof useBooth>;
+type Live = { status: LiveStatus; remote: MediaStream | null };
 
 function Screen(props: {
   booth: Booth;
   state: BoothState;
   camera: Camera;
+  live: Live;
   myLink: string;
   sessionId: string;
   token: string;
@@ -161,7 +181,7 @@ function PaymentScreen({ state, sessionId, token, justPaid, cancelled }: { state
 
 // ─── Lobby: camera check → invite → design → 7-day notice → waiting ─────────
 
-function Lobby({ booth, state, camera, myLink, onAway }: { booth: Booth; state: BoothState; camera: Camera; myLink: string; onAway: () => void }) {
+function Lobby({ booth, state, camera, live, myLink, onAway }: { booth: Booth; state: BoothState; camera: Camera; live: Live; myLink: string; onAway: () => void }) {
   const { me, partner } = state;
   const [busy, setBusy] = useState(false);
   const [agree, setAgree] = useState(false);
@@ -243,9 +263,7 @@ function Lobby({ booth, state, camera, myLink, onAway }: { booth: Booth; state: 
       {camera.status === "error" && camera.issue ? (
         <CameraTrouble paid={state.me.role === "A"} issue={camera.issue} onRetry={retryCamera} retrying={false} myLink={myLink} onLater={onAway} />
       ) : (
-        <div className="mx-auto w-40">
-          <CameraView camera={camera} />
-        </div>
+        <SplitView camera={camera} role={me.role} live={live} />
       )}
 
       <Card>
@@ -332,7 +350,7 @@ function InviteCard({ link, joined }: { link: string; joined: boolean }) {
 
 // ─── The four photos ────────────────────────────────────────────────────────
 
-function Rounds({ booth, state, camera, myLink, sessionId, token, onAway }: { booth: Booth; state: BoothState; camera: Camera; myLink: string; sessionId: string; token: string; onAway: () => void }) {
+function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }: { booth: Booth; state: BoothState; camera: Camera; live: Live; myLink: string; sessionId: string; token: string; onAway: () => void }) {
   const { me, partner, phase, attempt, round } = state;
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -459,14 +477,17 @@ function Rounds({ booth, state, camera, myLink, sessionId, token, onAway }: { bo
         </Card>
       ) : (
         <>
-          <CameraView camera={camera}>
+          <SplitView camera={camera} role={me.role} live={live}>
             {phase === "COUNTDOWN" && state.captureAt && !me.uploaded && <Countdown captureAt={state.captureAt} serverNow={booth.serverNow} onCapture={() => void onCapture()} />}
             {phase === "COUNTDOWN" && (me.uploaded || saving) && (
               <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-black/50 px-4 py-3 text-center text-sm text-white backdrop-blur">
                 {saving && !me.uploaded ? "Saving your photo…" : "Got it! Waiting for your person's photo…"}
               </div>
             )}
-          </CameraView>
+          </SplitView>
+          {phase === "READY" && live.status === "connected" && (
+            <p className="text-center text-xs text-ink-soft">This is how you&rsquo;ll appear side by side on your strip — strike a pose together.</p>
+          )}
           {phase === "READY" && (
             <div className="space-y-2">
               <p className="text-center font-display text-xl">Get ready.</p>

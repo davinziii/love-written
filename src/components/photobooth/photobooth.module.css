@@ -142,3 +142,33 @@
     animation: none !important;
   }
 }
+
+/* ── Live view: the two of you side by side, like one slot of the strip ── */
+.split {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 1.75rem;
+  background: #0b0b0b;
+  box-shadow: 0 30px 60px -30px rgb(43 29 34 / 0.55);
+}
+.tile {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.2rem;
+  background: #1c1517;
+  aspect-ratio: 3 / 4;
+}
+.tileLabel {
+  position: absolute;
+  left: 0.5rem;
+  bottom: 0.5rem;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.45);
+  padding: 0.15rem 0.55rem;
+  font-size: 0.7rem;
+  color: #fff;
+  backdrop-filter: blur(4px);
+}

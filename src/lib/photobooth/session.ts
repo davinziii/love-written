@@ -241,6 +241,7 @@ export async function buildState(ctx: BoothContext): Promise<BoothState> {
     realtimeKey: s.realtime_key,
     me: { ...person(me, s, current), role: me.role },
     partner: person(partner, s, current),
+    partnerSignal: s.status === "PAID" || s.status === "IN_PROGRESS" ? (partner.rtc_signal ?? null) : null,
     inviteLink: inviteToken ? participantLink(s.id, inviteToken) : null,
     review,
     result,

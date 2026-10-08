@@ -92,11 +92,34 @@ signal, and nothing is held up for anyone else.
 **Stuck countdown:** if a photo never arrives within 45 s of the shutter, the next state
 read restarts that photo (`pb_abort_stale`) and deletes the half-taken shot.
 
+## Live view (seeing each other)
+
+From the waiting room through every photo, both people see each other side by side —
+Person A on the left, Person B on the right, exactly like each slot of the strip — so they
+can pose together. Both tiles are mirrored (as you see yourself), and photos are saved
+mirrored too, so the strip matches what they saw.
+
+- **WebRTC, video only**, peer-to-peer and encrypted (DTLS-SRTP). Never recorded; never
+  touches our servers. Encoded lighter (≈700 kbps, half resolution) — it's a preview; the
+  photos themselves are captured locally at full quality.
+- **Signalling:** non-trickle ICE, so it's one message each way, stored on the participant
+  row (`rtc_signal`, migration 0006) and announced with the Realtime nudge: A posts an
+  `offer`, B posts an `answer`. A reloaded B posts a `request` and A offers again; on
+  failure A retries (up to 4×) and then the tile says the live view isn't available —
+  photos still work. Only participants of a running session can signal, in their own role.
+- **Relay (TURN):** `GET /api/photobooth/<id>/ice` returns ICE servers. With
+  `CLOUDFLARE_TURN_KEY_ID` + `CLOUDFLARE_TURN_API_TOKEN` set, it includes short-lived (24 h)
+  Cloudflare TURN credentials (port-53 URLs removed, cached server-side for 12 h); without
+  them, public STUN only (direct connections — fine on most Wi-Fi, often not on mobile
+  data). Cloudflare TURN: first 1,000 GB/month free.
+- Code: `src/components/photobooth/useLiveVideo.ts` (client), `src/lib/photobooth/rtc.ts`
+  (server), `SplitView` in `BoothParts.tsx`.
+
 ## Camera
 
 `navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })`.
 Video stays in the browser (the `<video>` preview is mirrored like a mirror). At the shutter,
-a 900×1200 (3:4) still is drawn to a canvas (not mirrored, like a real print) and uploaded as
+a 900×1200 (3:4) still is drawn to a canvas (mirrored, matching the live view) and uploaded as
 JPEG. Streams are stopped when leaving, on `pagehide`, and when the session no longer needs
 the camera. Only `/photobooth/s/*` may use the camera (`Permissions-Policy` in `next.config.ts`).
 
@@ -163,7 +186,8 @@ Never logged: tokens, photos, camera data.
 
 ## Setup checklist
 
-1. Run `supabase/migrations/0005_photobooth.sql` in the Supabase SQL editor.
+1. Run `supabase/migrations/0005_photobooth.sql` and `0006_photobooth_live_video.sql` in the Supabase SQL editor.
+1b. For the live view on mobile data: create a Cloudflare TURN key and set `CLOUDFLARE_TURN_KEY_ID` + `CLOUDFLARE_TURN_API_TOKEN`.
 2. (Optional) `PHOTOBOOTH_PRICE_CENTAVOS` in Vercel.
 3. Realtime is used automatically (Broadcast is on by default in Supabase). If you ever
    enable "private channels only" in Realtime settings, the booth simply falls back to polling.

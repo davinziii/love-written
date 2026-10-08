@@ -13,6 +13,8 @@ export type CameraStatus = "idle" | "starting" | "ready" | "error";
 export function useCamera() {
   const [status, setStatus] = useState<CameraStatus>("idle");
   const [issue, setIssue] = useState<CameraIssue | null>(null);
+  /** The live stream, for sending to your person in the live view (state, so effects can react). */
+  const [liveStream, setLiveStream] = useState<MediaStream | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const video = useRef<HTMLVideoElement | null>(null);
 
@@ -20,6 +22,7 @@ export function useCamera() {
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = null;
     if (video.current) video.current.srcObject = null;
+    setLiveStream(null);
     setStatus("idle");
   }, []);
 
@@ -43,6 +46,7 @@ export function useCamera() {
       // If another app grabs the camera (or it's unplugged), say so instead of freezing.
       s.getVideoTracks()[0]?.addEventListener("ended", () => {
         stream.current = null;
+        setLiveStream(null);
         setIssue("unavailable");
         setStatus("error");
       });
@@ -51,6 +55,7 @@ export function useCamera() {
         await video.current.play().catch(() => undefined);
       }
       setIssue(null);
+      setLiveStream(s);
       setStatus("ready");
       return null;
     } catch (err) {
@@ -78,7 +83,10 @@ export function useCamera() {
     }
   }, []);
 
-  /** Grab a 3:4 still from the live preview (un-mirrored, like a real photobooth print). */
+  /**
+   * Grab a 3:4 still exactly as the mirrored preview shows it — when two people pose side by
+   * side (leaning toward each other, making a heart together), the strip matches what they saw.
+   */
   const capture = useCallback(async (): Promise<Blob | null> => {
     const v = video.current;
     if (!v || !stream.current?.active || !v.videoWidth || !v.videoHeight) return null;
@@ -91,6 +99,8 @@ export function useCamera() {
     canvas.height = CAPTURE_HEIGHT;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
+    ctx.translate(CAPTURE_WIDTH, 0);
+    ctx.scale(-1, 1);
     ctx.drawImage(v, (v.videoWidth - sw) / 2, (v.videoHeight - sh) / 2, sw, sh, 0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT);
     return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.88));
   }, []);
@@ -100,6 +110,7 @@ export function useCamera() {
     const onHide = () => {
       stream.current?.getTracks().forEach((t) => t.stop());
       stream.current = null;
+      setLiveStream(null);
       setStatus("idle");
     };
     window.addEventListener("pagehide", onHide);
@@ -109,7 +120,7 @@ export function useCamera() {
     };
   }, []);
 
-  return { status, issue, start, stop, attach, capture };
+  return { status, issue, start, stop, attach, capture, liveStream };
 }
 
 export type Camera = ReturnType<typeof useCamera>;

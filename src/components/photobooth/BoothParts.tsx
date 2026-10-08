@@ -7,6 +7,7 @@ import { PHOTOBOOTH_ROUNDS } from "@/lib/photobooth/constants";
 import type { BoothPersonState, CameraIssue } from "@/lib/photobooth/types";
 import { ORDER_CONTACT } from "@/lib/payments/mode";
 import type { Camera } from "./useCamera";
+import type { LiveStatus } from "./useLiveVideo";
 import s from "./photobooth.module.css";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -28,6 +29,71 @@ function CameraFrame({ attach, status, children, dim }: { attach: Camera["attach
       )}
       {dim && <div className="absolute inset-0 bg-black/30" />}
       {children}
+    </div>
+  );
+}
+
+/**
+ * You and your person side by side — always Person A on the left and Person B on the right,
+ * exactly like each slot of the final strip, so poses line up the way they'll print.
+ * Both are shown mirrored (as each of you sees yourself), which is also how photos are saved.
+ */
+export function SplitView({
+  camera,
+  role,
+  live,
+  children,
+}: {
+  camera: Camera;
+  role: "A" | "B";
+  live: { status: LiveStatus; remote: MediaStream | null };
+  children?: ReactNode;
+}) {
+  const mine = <SelfTile key="me" attach={camera.attach} status={camera.status} />;
+  const theirs = <PartnerTile key="them" live={live} />;
+  return (
+    <div className={s.split}>
+      {role === "A" ? [mine, theirs] : [theirs, mine]}
+      {children}
+    </div>
+  );
+}
+
+function SelfTile({ attach, status }: { attach: Camera["attach"]; status: Camera["status"] }) {
+  return (
+    <div className={s.tile}>
+      <video ref={attach} className={s.video} playsInline muted autoPlay aria-label="Your camera" />
+      {status !== "ready" && <div className="absolute inset-0 grid place-items-center p-2 text-center text-xs text-white/70">{status === "starting" ? "Starting…" : "Camera off"}</div>}
+      <span className={s.tileLabel}>You</span>
+    </div>
+  );
+}
+
+function PartnerTile({ live }: { live: { status: LiveStatus; remote: MediaStream | null } }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (v.srcObject !== live.remote) v.srcObject = live.remote;
+    if (live.remote) void v.play().catch(() => undefined);
+  }, [live.remote]);
+  const showing = live.status === "connected" && live.remote;
+  return (
+    <div className={s.tile}>
+      <video ref={ref} className={s.video} playsInline muted autoPlay aria-label="Your person's camera" />
+      {!showing && (
+        <div className="absolute inset-0 grid place-items-center p-3 text-center text-xs leading-snug text-white/75">
+          {live.status === "unavailable" ? (
+            <span>Live view isn&rsquo;t available on this connection — you can still take photos together.</span>
+          ) : (
+            <span className="flex flex-col items-center gap-2">
+              <span className={`h-2.5 w-2.5 rounded-full bg-white/70 ${s.pulse}`} />
+              Connecting to your person…
+            </span>
+          )}
+        </div>
+      )}
+      <span className={s.tileLabel}>Your person</span>
     </div>
   );
 }

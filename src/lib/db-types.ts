@@ -181,6 +181,7 @@ export interface PhotoboothParticipantRow {
   camera_issue_at: string | null;
   deletion_ack_at: string | null;
   ready_attempt: number | null;
+  rtc_signal: import("@/lib/photobooth/types").RtcSignal | null;
   created_at: string;
   updated_at: string;
 }
