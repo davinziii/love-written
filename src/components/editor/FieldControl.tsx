@@ -20,13 +20,17 @@ export interface FieldControlProps {
   onChange: (value: string) => void;
   onImageSelect: (file: File) => void;
   onImageRemove: () => void;
+  /** Shorter label when the context already says what it is (e.g. "Date" under a memory photo). */
+  label?: string;
+  /** "fill": a textarea stretches to the height of its row. "compact": a smaller input for narrow columns. */
+  variant?: "fill" | "compact";
 }
 
 const inputClass =
   "w-full rounded-2xl border border-line bg-white px-4 py-3 text-[0.98rem] text-ink placeholder:text-ink-soft/50 focus:border-rose focus:outline-none focus:ring-4 focus:ring-rose/10 disabled:bg-cream";
 
 export function FieldControl(props: FieldControlProps) {
-  const { field, value, error, disabled, onChange } = props;
+  const { field, value, error, disabled, onChange, variant } = props;
   const id = `field-${field.id}`;
   const describedBy = [field.help ? `${id}-help` : null, error ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -70,7 +74,7 @@ export function FieldControl(props: FieldControlProps) {
         <textarea
           ref={textareaRef}
           id={id}
-          className={`${inputClass} min-h-24 resize-y leading-relaxed`}
+          className={`${inputClass} min-h-24 resize-y leading-relaxed ${variant === "fill" ? "flex-1" : ""}`}
           rows={field.rows ?? 4}
           value={value ?? ""}
           maxLength={field.maxLength}
@@ -87,7 +91,7 @@ export function FieldControl(props: FieldControlProps) {
         <input
           id={id}
           type="date"
-          className={`${inputClass} max-w-60`}
+          className={variant === "compact" ? `${inputClass} !px-3 !py-2.5 !text-sm` : `${inputClass} max-w-60`}
           value={value ?? ""}
           min="1900-01-01"
           max="2100-12-31"
@@ -172,10 +176,11 @@ export function FieldControl(props: FieldControlProps) {
     ) : null;
 
   return (
-    <div data-field={field.id} className="space-y-2">
-      <div className="flex items-center justify-between gap-3">
+    <div data-field={field.id} className={variant === "fill" ? "flex h-full flex-col gap-2" : "space-y-2"}>
+      {/* min-h keeps labels on one baseline when fields sit side by side */}
+      <div className="flex min-h-7 items-center justify-between gap-3">
         <label id={`${id}-label`} htmlFor={field.type === "color" || field.type === "font" ? undefined : id} className="text-sm font-medium text-ink">
-          {field.label}
+          {props.label ?? field.label}
           {field.required ? <span className="text-rose"> *</span> : <span className="font-normal text-ink-soft"> (optional)</span>}
         </label>
         <div className="flex items-center gap-2">

@@ -3,7 +3,7 @@
 import type { TemplateDefinition, FieldDef } from "@/templates/types";
 import { isStyleField } from "@/templates/types";
 import type { CustomerData } from "@/templates/schema";
-import { FieldControl, isFieldVisible } from "./FieldControl";
+import { FieldControl, isFieldVisible, type FieldControlProps } from "./FieldControl";
 import type { ImageState } from "./ImageFieldControl";
 import { PhotoGrid, PhotoTile } from "./PhotoGrid";
 
@@ -54,9 +54,10 @@ export function GenericEditor({
           ) : (
           <div className="mt-5 space-y-6">
             {rows(fields).map((row) => {
-              const control = (field: FieldDef) => (
+              const control = (field: FieldDef, extra?: Pick<FieldControlProps, "label" | "variant">) => (
                 <FieldControl
                   key={field.id}
+                  {...extra}
                   field={field}
                   value={isStyleField(field) ? data.style[field.id] : data.content[field.id]}
                   error={errors[field.id]}
@@ -78,12 +79,36 @@ export function GenericEditor({
                   onRemove={() => onImageRemove(field)}
                 />
               );
-              // A photo followed by its text ("what happened") sits side by side.
-              if (row.length === 2) {
+              // A memory. Wider screens: photo with its date underneath on the left, "what happened"
+              // on the right, both starting with a one-line label so the boxes line up.
+              // Phones: photo and date side by side, the text full width below.
+              if (row.length > 1) {
+                const [photo, text, date] = row as [FieldDef, FieldDef, FieldDef | undefined];
+                // "First memory — what happened" → heading "First memory", label "What happened",
+                // so both columns get one-line labels that line up.
+                const [title, rest] = text.label.includes(" — ") ? text.label.split(" — ", 2) : [null, text.label];
+                const textLabel = rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : text.label;
                 return (
-                  <div key={row[0]!.id} className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-4 sm:grid-cols-[8rem_minmax(0,1fr)]">
-                    <div className="pt-7">{tile(row[0]!, "Photo")}</div>
-                    {control(row[1]!)}
+                  <div
+                    key={photo.id}
+                    className="grid grid-cols-[8.5rem_minmax(0,1fr)] gap-x-4 gap-y-4 border-t border-line/70 pt-6 first:border-0 first:pt-0 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-x-5"
+                  >
+                    {title && <h3 className="col-span-2 -mb-2 font-display text-lg leading-tight">{title}</h3>}
+                    <div className="col-start-1 row-start-2 space-y-2">
+                      <p className="flex min-h-7 items-center text-sm font-medium text-ink">
+                        Photo
+                        {photo.required ? <span className="text-rose">&nbsp;*</span> : <span className="font-normal text-ink-soft">&nbsp;(optional)</span>}
+                      </p>
+                      {tile(photo, "")}
+                    </div>
+                    {date && (
+                      <div className="col-start-2 row-start-2 sm:col-start-1 sm:row-start-3">
+                        {control(date, { label: "Date", variant: "compact" })}
+                      </div>
+                    )}
+                    <div className={`col-span-2 row-start-3 sm:col-span-1 sm:col-start-2 sm:row-start-2 ${date ? "sm:row-span-2" : ""}`}>
+                      {control(text, { label: textLabel, variant: "fill" })}
+                    </div>
                   </div>
                 );
               }
@@ -104,15 +129,18 @@ export function GenericEditor({
   );
 }
 
-/** Pairs each photo with the textarea right after it; everything else is a row of one. */
+/**
+ * Groups a photo with the textarea right after it (and a date right after that, if any)
+ * into one "memory" row; everything else is a row of one.
+ */
 function rows(fields: FieldDef[]): FieldDef[][] {
   const out: FieldDef[][] = [];
   for (let i = 0; i < fields.length; i++) {
     const f = fields[i]!;
-    const next = fields[i + 1];
-    if (f.type === "image" && next?.type === "textarea") {
-      out.push([f, next]);
-      i++;
+    if (f.type === "image" && fields[i + 1]?.type === "textarea") {
+      const withDate = fields[i + 2]?.type === "date";
+      out.push(fields.slice(i, i + (withDate ? 3 : 2)));
+      i += withDate ? 2 : 1;
     } else out.push([f]);
   }
   return out;

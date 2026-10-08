@@ -156,7 +156,7 @@ export function PhotoTile({
   onRemove,
 }: {
   field: FieldDef;
-  /** Text under the tile (defaults to the field's label). */
+  /** Text under the tile (defaults to the field's label; "" hides it). */
   caption?: string;
   state?: ImageState;
   error?: string;
@@ -251,10 +251,12 @@ export function PhotoTile({
           </button>
         )}
       </div>
-      <p className="mt-1 text-center text-[11px] leading-tight text-ink-soft">
-        {caption ?? field.label}
-        {field.required ? <span className="text-rose"> *</span> : <span className="block">(optional)</span>}
-      </p>
+      {caption !== "" && (
+        <p className="mt-1 text-center text-[11px] leading-tight text-ink-soft">
+          {caption ?? field.label}
+          {field.required ? <span className="text-rose"> *</span> : <span className="block">(optional)</span>}
+        </p>
+      )}
       {message && (
         <p role="alert" className="mt-0.5 text-center text-[11px] leading-tight text-danger">
           {message}
