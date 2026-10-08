@@ -68,7 +68,7 @@ export function PhotoGrid({
   // Ctrl/⌘+V anywhere on the page (except while typing) pastes into this grid.
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
-      if (disabled) return;
+      if (disabled || e.defaultPrevented) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
       const files = [...(e.clipboardData?.files ?? [])];
@@ -144,16 +144,20 @@ export function PhotoGrid({
 
 const noSubscribe = () => () => {};
 
-function PhotoTile({
+/** One photo spot: tap to upload, drop a photo on it, or paste while it's selected. */
+export function PhotoTile({
   field,
   state,
   error,
   disabled,
+  caption,
   onSelect,
   onDrop,
   onRemove,
 }: {
   field: FieldDef;
+  /** Text under the tile (defaults to the field's label). */
+  caption?: string;
   state?: ImageState;
   error?: string;
   disabled?: boolean;
@@ -167,7 +171,17 @@ function PhotoTile({
   const message = state?.error ?? error;
 
   return (
-    <div data-photo-field={field.id} data-field={field.id} className="min-w-0">
+    <div
+      data-photo-field={field.id}
+      data-field={field.id}
+      className="min-w-0"
+      onPaste={(e) => {
+        const files = [...e.clipboardData.files].filter((f) => f.type.startsWith("image/"));
+        if (!files.length || disabled || busy) return;
+        e.preventDefault();
+        onDrop(files);
+      }}
+    >
       <input
         ref={inputRef}
         id={`field-${field.id}`}
@@ -238,7 +252,7 @@ function PhotoTile({
         )}
       </div>
       <p className="mt-1 text-center text-[11px] leading-tight text-ink-soft">
-        {field.label}
+        {caption ?? field.label}
         {field.required ? <span className="text-rose"> *</span> : <span className="block">(optional)</span>}
       </p>
       {message && (

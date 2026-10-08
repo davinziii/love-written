@@ -5,7 +5,7 @@ import { isStyleField } from "@/templates/types";
 import type { CustomerData } from "@/templates/schema";
 import { FieldControl, isFieldVisible } from "./FieldControl";
 import type { ImageState } from "./ImageFieldControl";
-import { PhotoGrid } from "./PhotoGrid";
+import { PhotoGrid, PhotoTile } from "./PhotoGrid";
 
 /**
  * The generic, schema-driven editor. It reads `template.fields`, groups them by
@@ -53,25 +53,69 @@ export function GenericEditor({
             </div>
           ) : (
           <div className="mt-5 space-y-6">
-            {fields.map((field) => (
-              <FieldControl
-                key={field.id}
-                field={field}
-                value={isStyleField(field) ? data.style[field.id] : data.content[field.id]}
-                image={images[field.id]}
-                error={errors[field.id]}
-                disabled={disabled}
-                onChange={(v) => onFieldChange(field, v)}
-                onImageSelect={(file) => onImageSelect(field, file)}
-                onImageRemove={() => onImageRemove(field)}
-              />
-            ))}
+            {rows(fields).map((row) => {
+              const control = (field: FieldDef) => (
+                <FieldControl
+                  key={field.id}
+                  field={field}
+                  value={isStyleField(field) ? data.style[field.id] : data.content[field.id]}
+                  error={errors[field.id]}
+                  disabled={disabled}
+                  onChange={(v) => onFieldChange(field, v)}
+                  onImageSelect={(file) => onImageSelect(field, file)}
+                  onImageRemove={() => onImageRemove(field)}
+                />
+              );
+              const tile = (field: FieldDef, caption?: string) => (
+                <PhotoTile
+                  field={field}
+                  caption={caption}
+                  state={images[field.id]}
+                  error={errors[field.id]}
+                  disabled={disabled}
+                  onSelect={(file) => onImageSelect(field, file)}
+                  onDrop={(files) => files[0] && onImageSelect(field, files[0])}
+                  onRemove={() => onImageRemove(field)}
+                />
+              );
+              // A photo followed by its text ("what happened") sits side by side.
+              if (row.length === 2) {
+                return (
+                  <div key={row[0]!.id} className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-4 sm:grid-cols-[8rem_minmax(0,1fr)]">
+                    <div className="pt-7">{tile(row[0]!, "Photo")}</div>
+                    {control(row[1]!)}
+                  </div>
+                );
+              }
+              const field = row[0]!;
+              return field.type === "image" ? (
+                <div key={field.id} className="w-32">
+                  {tile(field)}
+                </div>
+              ) : (
+                control(field)
+              );
+            })}
           </div>
           )}
         </section>
       ))}
     </div>
   );
+}
+
+/** Pairs each photo with the textarea right after it; everything else is a row of one. */
+function rows(fields: FieldDef[]): FieldDef[][] {
+  const out: FieldDef[][] = [];
+  for (let i = 0; i < fields.length; i++) {
+    const f = fields[i]!;
+    const next = fields[i + 1];
+    if (f.type === "image" && next?.type === "textarea") {
+      out.push([f, next]);
+      i++;
+    } else out.push([f]);
+  }
+  return out;
 }
 
 function groupFields(fields: readonly FieldDef[]): [string, FieldDef[]][] {

@@ -54,8 +54,6 @@ export interface FontField extends BaseField {
   default: FontId;
   /** Sample text shown on each option in the editor (default "Aa"). */
   previewText?: string;
-  /** "dropdown" for the main reading font ("Font style"); "cards" (default) shows every option. */
-  picker?: "dropdown" | "cards";
 }
 
 export interface MusicField extends BaseField {

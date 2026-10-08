@@ -25,6 +25,34 @@ export const ourStoryDefinition = defineTemplate({
     "Ten color themes, plus fonts for your story and final message",
   ],
   fields: [
+    // ── Look & Feel (always first — see TEMPLATE_DEVELOPMENT.md) ──
+    {
+      id: "theme",
+      type: "color",
+      label: "Color theme",
+      group: "Look & Feel",
+      options: THEME_IDS,
+      default: "blush",
+    },
+    {
+      id: "story_font",
+      type: "font",
+      label: "Story font",
+      group: "Look & Feel",
+      help: "Used for the titles, your opening message and every memory.",
+      options: STORY_FONT_IDS,
+      default: "lora",
+      previewText: "I wanted to make something just for you…",
+    },
+    {
+      id: "music",
+      type: "music",
+      label: "Background music",
+      group: "Look & Feel",
+      help: "Optional. Plays after they open the story.",
+      options: MUSIC_LIBRARY.map((t) => t.id),
+    },
+
     // ── The Opening ────────────────────────────────────────────────
     {
       id: "recipient_name",
@@ -160,34 +188,6 @@ export const ourStoryDefinition = defineTemplate({
       previewText: "I love you",
     },
 
-    // ── Look & Feel (style) ────────────────────────────────────────
-    {
-      id: "theme",
-      type: "color",
-      label: "Color theme",
-      group: "Look & Feel",
-      options: THEME_IDS,
-      default: "blush",
-    },
-    {
-      id: "story_font",
-      type: "font",
-      label: "Font style",
-      group: "Look & Feel",
-      help: "Used for the titles and every memory.",
-      options: STORY_FONT_IDS,
-      default: "lora",
-      previewText: "Our Story",
-      picker: "dropdown",
-    },
-    {
-      id: "music",
-      type: "music",
-      label: "Background music",
-      group: "Look & Feel",
-      help: "Optional. Plays after they open the story.",
-      options: MUSIC_LIBRARY.map((t) => t.id),
-    },
   ],
   sample: {
     recipient_name: "Samantha",

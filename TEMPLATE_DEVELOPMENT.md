@@ -106,8 +106,8 @@ Available field types (`src/templates/types.ts`):
 | `textarea` | multi-line input | `maxLength`, `rows`, `placeholder` | `content` |
 | `image` | photo upload (auto-compressed) | — | `media` table |
 | `date` | date picker (`YYYY-MM-DD`) | — | `content` |
-| `color` | theme swatches | `options` (theme ids), `default` | `style` |
-| `font` | font cards with a sample | `options` (font ids), `default`, `previewText` | `style` |
+| `color` | theme dropdown | `options` (theme ids), `default` | `style` |
+| `font` | font dropdown, each option shown in its font | `options` (font ids), `default`, `previewText` | `style` |
 | `music` | track picker (hidden while the library is empty) | `options` (track ids) | `style` |
 
 Themes, fonts and music tracks are curated in `src/templates/styles.ts`.
@@ -148,20 +148,25 @@ Validation is generic too (`src/templates/schema.ts`):
 - **strict mode** (checkout, publish, saves while scheduled) — every `required: true` field
   must be present, including photos.
 
-**Photo groups.** A group made only of image fields (e.g. "Your Photos") is shown as a
-compact grid of tiles that also accepts pasted and dropped photos — no extra work needed.
+**Photos.** Every image field is shown as a compact tile (tap to upload, drop, or paste a
+copied photo). A group made only of image fields becomes a grid of tiles; an image field
+followed directly by a textarea (e.g. a memory photo + "what happened") is shown side by side.
 
-**Look & Feel conventions (every template).** Keep this section identical across templates
-so customers always see the same controls:
+**Editor conventions (every template).** Keep these identical so customers always see the
+same thing:
 
-| Field id | Type | Label | Options | Notes |
-|---|---|---|---|---|
-| `theme` | color | **Color theme** | `THEME_IDS` (all 10) | shown as a palette dropdown |
-| `story_font` | font | **Font style** | `STORY_FONT_IDS` (all 6) | `picker: "dropdown"` |
-| `final_font` | font | template-specific, e.g. **Greeting font** / **Final message font** | `FINAL_FONT_IDS` (all 6) | cards (default picker) |
+1. **Look & Feel comes first** — put its fields at the very top of `fields` (the editor
+   shows groups in the order they first appear).
+2. Look & Feel holds the **Color theme** (`theme`, all 10 `THEME_IDS`) and the main
+   reading font (`story_font`, all `STORY_FONT_IDS`). Label the font after what it styles
+   — "Letter font", "Story font" — never a vague "Font style". Its `previewText` is the
+   first few words of the main text field's placeholder.
+3. A handwriting font (`final_font`, all `FINAL_FONT_IDS`) goes **right under the field it
+   styles** (e.g. "Greeting font" under Greeting, "Final message font" under the final message).
+4. Every font picker is the same dropdown (automatic for `type: "font"`).
 
-Renderers must therefore look good with **every** theme, including the dark ones
-(`midnight`, `noir`) — e.g. text printed on light "paper" needs its own dark ink color.
+Renderers must look good with **every** theme, including the dark ones (`midnight`,
+`noir`) — e.g. text printed on light "paper" needs its own dark ink color.
 
 The same function runs in the browser (to show "a few things still need your attention")
 and on the server (the one that actually counts).
@@ -248,15 +253,16 @@ export const birthdaySurpriseDefinition = defineTemplate({
   listed: false, // keep hidden until it's ready (section 10)
   highlights: ["Tap-to-light candles", "A photo wall of the year", "A wish they unwrap"],
   fields: [
+    // Look & Feel always comes first
+    { id: "theme", type: "color", label: "Color theme", group: "Look & Feel", options: THEME_IDS, default: "sunset" },
+    { id: "story_font", type: "font", label: "Story font", group: "Look & Feel", options: STORY_FONT_IDS, default: "nunito", previewText: "Happy birthday" },
     { id: "recipient_name", type: "text", label: "Birthday person's name", group: "The Party", required: true, maxLength: 40 },
     { id: "age", type: "text", label: "Age they're turning", group: "The Party", maxLength: 3, help: "Optional" },
     { id: "birthday_message", type: "textarea", label: "Birthday message", group: "The Party", required: true, maxLength: 600, rows: 4 },
     { id: "favorite_photo", type: "image", label: "Favorite photo of them", group: "Photos", required: true },
     { id: "wish", type: "textarea", label: "Your wish for them", group: "The Wish", required: true, maxLength: 300 },
-    { id: "sender_name", type: "text", label: "From", group: "The Wish", required: true, maxLength: 40 },
-    { id: "theme", type: "color", label: "Color theme", group: "Look & Feel", options: THEME_IDS, default: "sunset" },
-    { id: "story_font", type: "font", label: "Font style", group: "Look & Feel", options: STORY_FONT_IDS, default: "nunito", previewText: "Happy birthday", picker: "dropdown" },
     { id: "final_font", type: "font", label: "Wish font", group: "The Wish", options: FINAL_FONT_IDS, default: "dancing", previewText: "Make a wish" },
+    { id: "sender_name", type: "text", label: "From", group: "The Wish", required: true, maxLength: 40 },
   ],
   sample: {
     recipient_name: "Jamie", age: "30", birthday_message: "Thirty looks amazing on you…",

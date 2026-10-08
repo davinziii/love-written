@@ -35,6 +35,27 @@ export const letterForYouDefinition = defineTemplate({
     "Floating hearts, and taps make little hearts",
   ],
   fields: [
+    // ── Look & Feel (always first — see TEMPLATE_DEVELOPMENT.md) ──
+    {
+      id: "theme",
+      type: "color",
+      label: "Color theme",
+      group: "Look & Feel",
+      help: "The scene slowly warms into this color after the envelope opens.",
+      options: THEME_IDS,
+      default: "blush",
+    },
+    {
+      id: "story_font",
+      type: "font",
+      label: "Letter font",
+      group: "Look & Feel",
+      help: "Used for the letter itself — chosen to stay easy to read.",
+      options: STORY_FONT_IDS,
+      default: "garamond",
+      previewText: "I've been meaning to write this…",
+    },
+
     // ── The Letter ─────────────────────────────────────────────────
     {
       id: "recipient_name",
@@ -53,6 +74,16 @@ export const letterForYouDefinition = defineTemplate({
       help: "Shown before their name. Leave blank for “Dear”.",
       maxLength: 24,
       placeholder: "Dear",
+    },
+    {
+      id: "final_font",
+      type: "font",
+      label: "Greeting font",
+      group: "The Letter",
+      help: "Used for the greeting and your signature.",
+      options: FINAL_FONT_IDS,
+      default: "parisienne",
+      previewText: "Dear you",
     },
     {
       id: "letter_opening",
@@ -109,37 +140,6 @@ export const letterForYouDefinition = defineTemplate({
     photo(11, false),
     photo(12, false),
 
-    // ── Look & Feel ────────────────────────────────────────────────
-    {
-      id: "theme",
-      type: "color",
-      label: "Color theme",
-      group: "Look & Feel",
-      help: "The scene slowly warms into this color after the envelope opens.",
-      options: THEME_IDS,
-      default: "blush",
-    },
-    {
-      id: "story_font",
-      type: "font",
-      label: "Font style",
-      group: "Look & Feel",
-      help: "Used for the letter itself — chosen to stay easy to read.",
-      options: STORY_FONT_IDS,
-      default: "garamond",
-      previewText: "My love,",
-      picker: "dropdown",
-    },
-    {
-      id: "final_font",
-      type: "font",
-      label: "Greeting font",
-      group: "Look & Feel",
-      help: "Used for the greeting and your signature.",
-      options: FINAL_FONT_IDS,
-      default: "parisienne",
-      previewText: "Dear you",
-    },
   ],
   sample: {
     recipient_name: "Samantha",

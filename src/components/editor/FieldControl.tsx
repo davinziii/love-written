@@ -112,58 +112,21 @@ export function FieldControl(props: FieldControlProps) {
       );
       break;
     case "font":
-      control =
-        field.picker === "dropdown" ? (
-          <Dropdown
-            labelledBy={`${id}-label`}
-            describedBy={describedBy}
-            disabled={disabled}
-            value={value ?? field.default}
-            onChange={onChange}
-            options={field.options.map((opt) => ({
-              value: opt,
-              label: `${FONTS[opt].label} — ${FONTS[opt].hint}`,
-              render: <FontOption font={FONTS[opt]} sample={field.previewText} />,
-            }))}
-          />
-        ) : (
-          <div role="radiogroup" aria-labelledby={`${id}-label`} className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-            {field.options.map((opt) => {
-              const font: Font = FONTS[opt];
-              const selected = (value ?? field.default) === opt;
-              return (
-                <button
-                  key={opt}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  aria-label={`${font.label} — ${font.hint}`}
-                  disabled={disabled}
-                  onClick={() => onChange(opt)}
-                  className={`flex h-[5.5rem] w-full flex-col justify-between rounded-2xl px-3 py-2.5 text-left transition ${
-                    selected ? "bg-petal ring-2 ring-rose" : "bg-white ring-1 ring-line hover:-translate-y-0.5 hover:ring-ink/30"
-                  }`}
-                >
-                  <span
-                    className="block truncate leading-tight text-ink"
-                    style={{
-                      fontFamily: `var(${font.cssVar})`,
-                      fontStyle: font.italic ? "italic" : undefined,
-                      fontSize: `${1.25 * (font.scale ?? 1)}rem`,
-                    }}
-                    aria-hidden
-                  >
-                    {field.previewText ?? "Aa"}
-                  </span>
-                  <span className="block text-[11px] leading-tight">
-                    <span className="font-medium text-ink">{font.label}</span>
-                    <span className="block text-ink-soft">{font.hint}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        );
+      // Every font picker is the same dropdown, each option previewed in its own font.
+      control = (
+        <Dropdown
+          labelledBy={`${id}-label`}
+          describedBy={describedBy}
+          disabled={disabled}
+          value={value ?? field.default}
+          onChange={onChange}
+          options={field.options.map((opt) => ({
+            value: opt,
+            label: `${FONTS[opt].label} — ${FONTS[opt].hint}`,
+            render: <FontOption font={FONTS[opt]} sample={field.previewText} />,
+          }))}
+        />
+      );
       break;
     case "music": {
       const tracks = MUSIC_LIBRARY.filter((t) => (field.options as readonly string[]).includes(t.id));
@@ -256,18 +219,18 @@ function ThemeOption({ id }: { id: string }) {
   );
 }
 
+/** The sample in the font itself, with its name underneath — left-aligned so every row lines up. */
 function FontOption({ font, sample }: { font: Font; sample?: string }) {
   return (
-    <span className="flex items-baseline justify-between gap-3">
+    <span className="block min-w-0 text-left">
       <span
-        className="truncate leading-snug text-ink"
-        style={{ fontFamily: `var(${font.cssVar})`, fontStyle: font.italic ? "italic" : undefined, fontSize: `${1.15 * (font.scale ?? 1)}rem` }}
+        className="block truncate leading-snug text-ink"
+        style={{ fontFamily: `var(${font.cssVar})`, fontStyle: font.italic ? "italic" : undefined, fontSize: `${1.12 * (font.scale ?? 1)}rem` }}
       >
         {sample ?? "Aa"}
       </span>
-      <span className="shrink-0 text-right text-[11px] leading-tight">
-        <span className="block font-medium text-ink">{font.label}</span>
-        <span className="block text-ink-soft">{font.hint}</span>
+      <span className="mt-0.5 block text-[11px] leading-tight text-ink-soft">
+        <span className="font-medium text-ink">{font.label}</span> · {font.hint}
       </span>
     </span>
   );
