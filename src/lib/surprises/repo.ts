@@ -18,6 +18,7 @@ import {
   sha256Hex,
 } from "@/lib/security/tokens";
 import { signedUrls } from "@/lib/media/storage";
+import { saveAccess } from "@/lib/security/access-vault";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -68,7 +69,10 @@ export async function createDraft(templateId: string) {
       })
       .select("*")
       .single();
-    if (!error) return { row: data as SurpriseRow, editToken, recoveryCode };
+    if (!error) {
+      await saveAccess((data as SurpriseRow).id, { editToken, recoveryCode });
+      return { row: data as SurpriseRow, editToken, recoveryCode };
+    }
     if (error.code !== UNIQUE_VIOLATION) throw new Error(`create draft: ${error.message}`);
   }
   throw new Error("create draft: could not allocate recovery code");
@@ -93,6 +97,7 @@ export async function redeemRecoveryCode(code: string) {
     .update({ edit_token_hash: sha256Hex(editToken) })
     .eq("id", data.id);
   if (updError) throw new Error(`recover rotate: ${updError.message}`);
+  await saveAccess(data.id as string, { editToken, recoveryCode: `${normalized.slice(0, 4)}-${normalized.slice(4, 8)}-${normalized.slice(8)}` });
   return { surpriseId: data.id as string, templateId: data.template_id as string, editToken };
 }
 

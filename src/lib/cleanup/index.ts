@@ -4,6 +4,7 @@ import { log, errorMessage } from "@/lib/log";
 import type { CleanupJobRow } from "@/lib/db-types";
 import { listSurpriseObjects, removeObjects } from "@/lib/media/storage";
 import { alert } from "@/lib/alerts";
+import { saveAccess } from "@/lib/security/access-vault";
 
 /**
  * Deletion lifecycle. A surprise is only marked DELETED after its photos and content
@@ -67,6 +68,7 @@ export async function runCleanupJob(jobId: string, { force = false } = {}): Prom
       .update({ content: {}, style: {}, stage: "DELETED", deleted_at: new Date().toISOString() })
       .eq("id", surpriseId);
     if (wipeError) throw new Error(`wipe content: ${wipeError.message}`);
+    await saveAccess(surpriseId, null);
 
     // 4. Verify everything is really gone.
     remaining = await listSurpriseObjects(surpriseId);

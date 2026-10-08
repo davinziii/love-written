@@ -10,7 +10,10 @@ import { TemplateExperience } from "@/templates/renderers";
 import { buildRenderData } from "@/templates/render-data";
 import { getTemplate, isTemplateId } from "@/templates";
 import { formatPeso } from "@/lib/format";
-import { UNPUBLISHED_PAID_TTL_DAYS } from "@/lib/lifecycle";
+import { canEdit, UNPUBLISHED_PAID_TTL_DAYS } from "@/lib/lifecycle";
+import { loadAccess } from "@/lib/security/access-vault";
+import { customizationLink } from "@/lib/payments/manual";
+import { IssuedAccessCard } from "@/components/admin/IssuedAccessCard";
 import { deleteNowAction, disableSurpriseAction, retryPublishAction } from "../../actions";
 
 type Props = { params: Promise<{ id: string }> };
@@ -30,6 +33,8 @@ export default async function SurpriseDetailPage({ params }: Props) {
   const ops = [...s.publish_operations].sort((a, b) => b.started_at.localeCompare(a.started_at));
   const link = publicUrl(s.public_token);
   const hasContent = Object.keys(s.content ?? {}).length > 0;
+  // While it can still be edited, admins can re-send the customer's private link.
+  const saved = canEdit(s.stage) ? await loadAccess(s.id) : null;
 
   return (
     <>
@@ -77,6 +82,29 @@ export default async function SurpriseDetailPage({ params }: Props) {
             )}
             {s.disabled_reason && <p className="mt-2 text-sm text-danger">Disabled: {s.disabled_reason}</p>}
           </Card>
+
+          {saved ? (
+            <IssuedAccessCard
+              saved
+              access={{
+                surpriseId: s.id,
+                orderNumber: order?.order_number ?? "",
+                customizationLink: customizationLink(s.id, saved.editToken, saved.recoveryCode),
+                recoveryCode: saved.recoveryCode,
+                replayed: false,
+              }}
+            />
+          ) : (
+            canEdit(s.stage) && (
+              <Card>
+                <h2 className="text-sm font-semibold">Customer edit link</h2>
+                <p className="mt-1 text-sm text-ink-soft">
+                  No saved copy for this surprise (it was issued before links were saved). Use <strong>New customer link</strong> below to
+                  issue one &mdash; the customer&rsquo;s old link will stop working.
+                </p>
+              </Card>
+            )
+          )}
 
           {order?.notes && (
             <Card>

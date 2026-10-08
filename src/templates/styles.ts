@@ -130,6 +130,9 @@ export const THEMES = {
 
 export type ThemeId = keyof typeof THEMES;
 
+/** Every color theme, in display order. Templates offer all of them (see TEMPLATE_DEVELOPMENT.md). */
+export const THEME_IDS = ["blush", "midnight", "sunset", "sage", "lavender", "ocean", "cherry", "champagne", "latte", "noir"] as const satisfies readonly ThemeId[];
+
 export interface Font {
   id: string;
   label: string;

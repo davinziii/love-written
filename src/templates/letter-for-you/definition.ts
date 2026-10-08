@@ -1,4 +1,5 @@
 import { defineTemplate, type TemplateData } from "../types";
+import { FINAL_FONT_IDS, STORY_FONT_IDS, THEME_IDS } from "../styles";
 
 /**
  * A Letter for You — field schema.
@@ -112,29 +113,30 @@ export const letterForYouDefinition = defineTemplate({
     {
       id: "theme",
       type: "color",
-      label: "Mood",
+      label: "Color theme",
       group: "Look & Feel",
       help: "The scene slowly warms into this color after the envelope opens.",
-      options: ["blush", "champagne", "lavender", "sunset"],
+      options: THEME_IDS,
       default: "blush",
     },
     {
       id: "story_font",
       type: "font",
-      label: "Letter font",
+      label: "Font style",
       group: "Look & Feel",
       help: "Used for the letter itself — chosen to stay easy to read.",
-      options: ["garamond", "lora", "cormorant", "baskerville"],
+      options: STORY_FONT_IDS,
       default: "garamond",
       previewText: "My love,",
+      picker: "dropdown",
     },
     {
       id: "final_font",
       type: "font",
-      label: "Handwriting",
+      label: "Greeting font",
       group: "Look & Feel",
       help: "Used for the greeting and your signature.",
-      options: ["great_vibes", "parisienne", "sacramento", "dancing", "caveat"],
+      options: FINAL_FONT_IDS,
       default: "parisienne",
       previewText: "Dear you",
     },

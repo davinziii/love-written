@@ -1,5 +1,5 @@
 import { defineTemplate, type TemplateData } from "../types";
-import { FINAL_FONT_IDS, MUSIC_LIBRARY, STORY_FONT_IDS } from "../styles";
+import { FINAL_FONT_IDS, MUSIC_LIBRARY, STORY_FONT_IDS, THEME_IDS } from "../styles";
 
 /**
  * Our Story — the field schema.
@@ -166,18 +166,19 @@ export const ourStoryDefinition = defineTemplate({
       type: "color",
       label: "Color theme",
       group: "Look & Feel",
-      options: ["blush", "midnight", "sunset", "sage", "lavender", "ocean", "cherry", "champagne", "latte", "noir"],
+      options: THEME_IDS,
       default: "blush",
     },
     {
       id: "story_font",
       type: "font",
-      label: "Story font",
+      label: "Font style",
       group: "Look & Feel",
       help: "Used for the titles and every memory.",
       options: STORY_FONT_IDS,
       default: "lora",
       previewText: "Our Story",
+      picker: "dropdown",
     },
     {
       id: "music",

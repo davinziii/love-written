@@ -61,6 +61,8 @@ export const Icon = {
   arrowRight: (p: IconProps) => <Svg {...p}><path d="M5 12h14M13 6l6 6-6 6" /></Svg>,
   check: (p: IconProps) => <Svg {...p}><path d="m5 12 5 5L20 7" /></Svg>,
   copy: (p: IconProps) => <Svg {...p}><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h8" /></Svg>,
+  chevronDown: (p: IconProps) => <Svg {...p}><path d="m6 9 6 6 6-6" /></Svg>,
+  clipboard: (p: IconProps) => <Svg {...p}><rect x="6" y="4" width="12" height="17" rx="2" /><path d="M9 4V3h6v1" /><path d="M9 11h6M9 15h4" /></Svg>,
   link: (p: IconProps) => <Svg {...p}><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></Svg>,
   image: (p: IconProps) => <Svg {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="2" /><path d="m21 17-5-5-9 8" /></Svg>,
   message: (p: IconProps) => <Svg {...p}><path d="M4 5h16v11H9l-5 4V5z" /></Svg>,

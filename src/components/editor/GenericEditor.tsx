@@ -5,6 +5,7 @@ import { isStyleField } from "@/templates/types";
 import type { CustomerData } from "@/templates/schema";
 import { FieldControl, isFieldVisible } from "./FieldControl";
 import type { ImageState } from "./ImageFieldControl";
+import { PhotoGrid } from "./PhotoGrid";
 
 /**
  * The generic, schema-driven editor. It reads `template.fields`, groups them by
@@ -39,6 +40,18 @@ export function GenericEditor({
           <h2 id={`group-${slug(group)}`} className="font-display text-xl">
             {group}
           </h2>
+          {fields.length > 1 && fields.every((f) => f.type === "image") ? (
+            <div className="mt-4">
+              <PhotoGrid
+                fields={fields}
+                images={images}
+                errors={errors}
+                disabled={disabled}
+                onSelect={onImageSelect}
+                onRemove={onImageRemove}
+              />
+            </div>
+          ) : (
           <div className="mt-5 space-y-6">
             {fields.map((field) => (
               <FieldControl
@@ -54,6 +67,7 @@ export function GenericEditor({
               />
             ))}
           </div>
+          )}
         </section>
       ))}
     </div>

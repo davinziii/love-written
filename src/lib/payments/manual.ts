@@ -13,6 +13,7 @@ import {
   sha256Hex,
 } from "@/lib/security/tokens";
 import { getTemplate } from "@/templates";
+import { saveAccess } from "@/lib/security/access-vault";
 
 /**
  * Manual payment provider (launch workflow).
@@ -93,6 +94,7 @@ export async function createManualOrder(input: ManualOrderInput, adminId: string
   if (!row) throw new Error("create manual order: no result");
 
   log.info("manual_order_created", { surpriseId: row.surprise_id, orderNumber: row.order_number, adminId, replayed: row.replayed });
+  if (row.credentials_issued) await saveAccess(row.surprise_id, { editToken: creds.editToken, recoveryCode: creds.recoveryCode });
   if (!row.replayed) {
     await track("payment_successful", { templateId: template.id, surpriseId: row.surprise_id });
   }
@@ -129,6 +131,7 @@ export async function reissueAccess(surpriseId: string, adminId: string): Promis
     .limit(1)
     .maybeSingle();
 
+  await saveAccess(surpriseId, { editToken: creds.editToken, recoveryCode: creds.recoveryCode });
   log.warn("access_reissued", { surpriseId, adminId });
   return {
     surpriseId,

@@ -5,10 +5,10 @@ import { Icon } from "@/components/ui/icons";
 import type { IssuedAccess } from "@/lib/payments/manual";
 
 /**
- * Shows a freshly issued private link + recovery code ONCE (they're stored hashed, so
- * they can't be shown again), with a ready-to-paste message for the customer's DM.
+ * Shows the customer's private link + recovery code with a ready-to-paste DM message —
+ * right after it's issued, or later (`saved`) from the encrypted admin copy.
  */
-export function IssuedAccessCard({ access }: { access: IssuedAccess }) {
+export function IssuedAccessCard({ access, saved = false }: { access: IssuedAccess; saved?: boolean }) {
   if (!access.customizationLink || !access.recoveryCode) return null;
   const message = [
     "Hi! 💌 Your Love, Written order is confirmed.",
@@ -30,11 +30,13 @@ export function IssuedAccessCard({ access }: { access: IssuedAccess }) {
         <span className="grid h-7 w-7 place-items-center rounded-full bg-success text-white">
           <Icon.check size={15} strokeWidth={3} />
         </span>
-        Private link ready{access.orderNumber ? ` · ${access.orderNumber}` : ""}
+        {saved ? "Customer edit link" : "Private link ready"}
+        {access.orderNumber ? ` · ${access.orderNumber}` : ""}
       </p>
       <p className="mt-2 text-sm text-ink-soft">
-        Copy it now — for security we don&rsquo;t keep it in readable form, so it <strong>can&rsquo;t be shown again</strong>. If it&rsquo;s lost,
-        issue a new one from the surprise&rsquo;s page.
+        {saved
+          ? "The customer's current private link. Anyone with it can edit this surprise until it goes live, so only send it to the customer."
+          : "Send it to the customer. Until the surprise goes live you can copy it again from the surprise's page."}
       </p>
       <div className="mt-5 space-y-3">
         <CopyRow label="Customization link" value={access.customizationLink} mono />

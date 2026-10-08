@@ -4,6 +4,7 @@ import { listOrders } from "@/lib/admin/queries";
 import { Badge, EmptyState, PageTitle, PrimaryLink, Table, fmt } from "@/components/admin/ui";
 import { formatPeso } from "@/lib/format";
 import { getTemplate } from "@/templates";
+import { Icon } from "@/components/ui/icons";
 
 const CHANNEL: Record<string, string> = { gcash: "GCash", maya: "Maya", bank_transfer: "Bank", other: "Other" };
 
@@ -47,8 +48,11 @@ export default async function OrdersPage() {
                 <td className="px-4 py-3">{o.surprises && <Badge value={o.surprises.stage} />}</td>
                 <td className="px-4 py-3 text-ink-soft">{fmt(o.created_at)}</td>
                 <td className="px-4 py-3 text-right">
-                  <Link href={`/admin/surprises/${o.surprise_id}`} className="text-rose underline underline-offset-4">
-                    View
+                  <Link
+                    href={`/admin/surprises/${o.surprise_id}`}
+                    className="lw-press inline-flex items-center gap-1 rounded-full bg-soft px-3 py-1.5 text-xs font-medium hover:bg-petal hover:text-rose"
+                  >
+                    View <Icon.arrowRight size={13} />
                   </Link>
                 </td>
               </tr>

@@ -148,6 +148,21 @@ Validation is generic too (`src/templates/schema.ts`):
 - **strict mode** (checkout, publish, saves while scheduled) — every `required: true` field
   must be present, including photos.
 
+**Photo groups.** A group made only of image fields (e.g. "Your Photos") is shown as a
+compact grid of tiles that also accepts pasted and dropped photos — no extra work needed.
+
+**Look & Feel conventions (every template).** Keep this section identical across templates
+so customers always see the same controls:
+
+| Field id | Type | Label | Options | Notes |
+|---|---|---|---|---|
+| `theme` | color | **Color theme** | `THEME_IDS` (all 10) | shown as a palette dropdown |
+| `story_font` | font | **Font style** | `STORY_FONT_IDS` (all 6) | `picker: "dropdown"` |
+| `final_font` | font | template-specific, e.g. **Greeting font** / **Final message font** | `FINAL_FONT_IDS` (all 6) | cards (default picker) |
+
+Renderers must therefore look good with **every** theme, including the dark ones
+(`midnight`, `noir`) — e.g. text printed on light "paper" needs its own dark ink color.
+
 The same function runs in the browser (to show "a few things still need your attention")
 and on the server (the one that actually counts).
 
@@ -239,8 +254,8 @@ export const birthdaySurpriseDefinition = defineTemplate({
     { id: "favorite_photo", type: "image", label: "Favorite photo of them", group: "Photos", required: true },
     { id: "wish", type: "textarea", label: "Your wish for them", group: "The Wish", required: true, maxLength: 300 },
     { id: "sender_name", type: "text", label: "From", group: "The Wish", required: true, maxLength: 40 },
-    { id: "theme", type: "color", label: "Color theme", group: "Look & Feel", options: ["sunset", "lavender", "midnight"], default: "sunset" },
-    { id: "story_font", type: "font", label: "Story font", group: "Look & Feel", options: STORY_FONT_IDS, default: "nunito", previewText: "Happy birthday" },
+    { id: "theme", type: "color", label: "Color theme", group: "Look & Feel", options: THEME_IDS, default: "sunset" },
+    { id: "story_font", type: "font", label: "Font style", group: "Look & Feel", options: STORY_FONT_IDS, default: "nunito", previewText: "Happy birthday", picker: "dropdown" },
     { id: "final_font", type: "font", label: "Wish font", group: "The Wish", options: FINAL_FONT_IDS, default: "dancing", previewText: "Make a wish" },
   ],
   sample: {

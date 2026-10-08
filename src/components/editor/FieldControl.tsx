@@ -5,6 +5,7 @@ import { EmojiPicker } from "./EmojiPicker";
 import type { FieldDef } from "@/templates/types";
 import { FONTS, getTheme, MUSIC_LIBRARY, NO_MUSIC, type Font } from "@/templates/styles";
 import { ImageFieldControl, type ImageState } from "./ImageFieldControl";
+import { Dropdown } from "./Dropdown";
 
 /**
  * Renders the right control for a field TYPE. It knows nothing about any template —
@@ -99,77 +100,70 @@ export function FieldControl(props: FieldControlProps) {
       break;
     case "color":
       control = (
-        // Fixed grid: every option is exactly the same width and height.
-        <div role="radiogroup" aria-labelledby={`${id}-label`} className="grid grid-cols-3 gap-2.5 sm:grid-cols-5">
-          {field.options.map((opt) => {
-            const theme = getTheme(opt);
-            const selected = (value ?? field.default) === opt;
-            return (
-              <button
-                key={opt}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                aria-label={theme.label}
-                disabled={disabled}
-                onClick={() => onChange(opt)}
-                className={`flex h-[5.75rem] w-full flex-col items-center justify-center gap-2 rounded-2xl px-1 text-xs transition ${
-                  selected ? "bg-petal ring-2 ring-rose" : "bg-white ring-1 ring-line hover:-translate-y-0.5 hover:ring-ink/30"
-                }`}
-              >
-                <span
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-full ring-1 ring-black/10"
-                  style={{ background: theme.bg }}
-                  aria-hidden
-                >
-                  <span className="h-4.5 w-4.5 rounded-full" style={{ background: theme.accent }} />
-                </span>
-                <span className="w-full truncate text-center leading-tight">{theme.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        <Dropdown
+          labelledBy={`${id}-label`}
+          describedBy={describedBy}
+          disabled={disabled}
+          value={value ?? field.default}
+          onChange={onChange}
+          columns={2}
+          options={field.options.map((opt) => ({ value: opt, label: getTheme(opt).label, render: <ThemeOption id={opt} /> }))}
+        />
       );
       break;
     case "font":
-      control = (
-        <div role="radiogroup" aria-labelledby={`${id}-label`} className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-          {field.options.map((opt) => {
-            const font: Font = FONTS[opt];
-            const selected = (value ?? field.default) === opt;
-            return (
-              <button
-                key={opt}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                aria-label={`${font.label} — ${font.hint}`}
-                disabled={disabled}
-                onClick={() => onChange(opt)}
-                className={`flex h-[5.5rem] w-full flex-col justify-between rounded-2xl px-3 py-2.5 text-left transition ${
-                  selected ? "bg-petal ring-2 ring-rose" : "bg-white ring-1 ring-line hover:-translate-y-0.5 hover:ring-ink/30"
-                }`}
-              >
-                <span
-                  className="block truncate leading-tight text-ink"
-                  style={{
-                    fontFamily: `var(${font.cssVar})`,
-                    fontStyle: font.italic ? "italic" : undefined,
-                    fontSize: `${1.25 * (font.scale ?? 1)}rem`,
-                  }}
-                  aria-hidden
+      control =
+        field.picker === "dropdown" ? (
+          <Dropdown
+            labelledBy={`${id}-label`}
+            describedBy={describedBy}
+            disabled={disabled}
+            value={value ?? field.default}
+            onChange={onChange}
+            options={field.options.map((opt) => ({
+              value: opt,
+              label: `${FONTS[opt].label} — ${FONTS[opt].hint}`,
+              render: <FontOption font={FONTS[opt]} sample={field.previewText} />,
+            }))}
+          />
+        ) : (
+          <div role="radiogroup" aria-labelledby={`${id}-label`} className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            {field.options.map((opt) => {
+              const font: Font = FONTS[opt];
+              const selected = (value ?? field.default) === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  aria-label={`${font.label} — ${font.hint}`}
+                  disabled={disabled}
+                  onClick={() => onChange(opt)}
+                  className={`flex h-[5.5rem] w-full flex-col justify-between rounded-2xl px-3 py-2.5 text-left transition ${
+                    selected ? "bg-petal ring-2 ring-rose" : "bg-white ring-1 ring-line hover:-translate-y-0.5 hover:ring-ink/30"
+                  }`}
                 >
-                  {field.previewText ?? "Aa"}
-                </span>
-                <span className="block text-[11px] leading-tight">
-                  <span className="font-medium text-ink">{font.label}</span>
-                  <span className="block text-ink-soft">{font.hint}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      );
+                  <span
+                    className="block truncate leading-tight text-ink"
+                    style={{
+                      fontFamily: `var(${font.cssVar})`,
+                      fontStyle: font.italic ? "italic" : undefined,
+                      fontSize: `${1.25 * (font.scale ?? 1)}rem`,
+                    }}
+                    aria-hidden
+                  >
+                    {field.previewText ?? "Aa"}
+                  </span>
+                  <span className="block text-[11px] leading-tight">
+                    <span className="font-medium text-ink">{font.label}</span>
+                    <span className="block text-ink-soft">{font.hint}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        );
       break;
     case "music": {
       const tracks = MUSIC_LIBRARY.filter((t) => (field.options as readonly string[]).includes(t.id));
@@ -245,4 +239,36 @@ export function FieldControl(props: FieldControlProps) {
 export function isFieldVisible(field: FieldDef): boolean {
   if (field.type !== "music") return true;
   return MUSIC_LIBRARY.some((t) => (field.options as readonly string[]).includes(t.id));
+}
+
+/** A theme as a tiny "page": background, glow, accent dot and a line of text. */
+function ThemeOption({ id }: { id: string }) {
+  const theme = getTheme(id);
+  return (
+    <span className="flex items-center gap-3">
+      <span className="relative h-9 w-12 shrink-0 overflow-hidden rounded-lg ring-1 ring-black/10" style={{ background: theme.bg }} aria-hidden>
+        <span className="absolute -right-2.5 -top-2.5 h-8 w-8 rounded-full opacity-90" style={{ background: theme.glow }} />
+        <span className="absolute bottom-1.5 left-1.5 h-3.5 w-3.5 rounded-full" style={{ background: theme.accent }} />
+        <span className="absolute bottom-[0.6rem] left-6 h-1 w-4 rounded-full opacity-60" style={{ background: theme.ink }} />
+      </span>
+      <span className="truncate text-sm font-medium text-ink">{theme.label}</span>
+    </span>
+  );
+}
+
+function FontOption({ font, sample }: { font: Font; sample?: string }) {
+  return (
+    <span className="flex items-baseline justify-between gap-3">
+      <span
+        className="truncate leading-snug text-ink"
+        style={{ fontFamily: `var(${font.cssVar})`, fontStyle: font.italic ? "italic" : undefined, fontSize: `${1.15 * (font.scale ?? 1)}rem` }}
+      >
+        {sample ?? "Aa"}
+      </span>
+      <span className="shrink-0 text-right text-[11px] leading-tight">
+        <span className="block font-medium text-ink">{font.label}</span>
+        <span className="block text-ink-soft">{font.hint}</span>
+      </span>
+    </span>
+  );
 }

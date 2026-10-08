@@ -5,6 +5,8 @@
 import { useRef } from "react";
 import { Spinner } from "@/components/ui/Button";
 
+export const ACCEPTED_IMAGES = "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif";
+
 export interface ImageState {
   url?: string;
   uploading?: boolean;
@@ -32,12 +34,20 @@ export function ImageFieldControl({
   const busy = Boolean(state?.uploading);
 
   return (
-    <div>
+    // Paste a copied photo while this control (or its button) is focused.
+    <div
+      onPaste={(e) => {
+        const file = [...e.clipboardData.files].find((f) => f.type.startsWith("image/"));
+        if (!file || disabled || busy) return;
+        e.preventDefault();
+        onSelect(file);
+      }}
+    >
       <input
         ref={inputRef}
         id={id}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+        accept={ACCEPTED_IMAGES}
         className="sr-only"
         disabled={disabled || busy}
         onChange={(e) => {
