@@ -3,11 +3,12 @@
 /* eslint-disable @next/next/no-img-element -- media is pre-optimized and served via signed URLs */
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import type { RendererProps } from "../types";
 import { getFont, getTheme, themeVars } from "../styles";
 import { HeartIcon } from "../shared/icons";
 import { BURST, FLOWER_SET } from "./flowers";
+import { arrangeDesktop, arrangeStack, PHOTO_STYLES, SIZE_REM, type Group, type Placement } from "./arrange";
 import type { LetterForYouData } from "./definition";
 import s from "./letter-for-you.module.css";
 
@@ -24,42 +25,19 @@ import s from "./letter-for-you.module.css";
  */
 
 type Phase = "closed" | "opening" | "open";
+type Layout = "stack" | "desktop";
 type Enter = "enterRise" | "enterTurn" | "enterPop" | "enterSide";
 
-interface Slot {
-  r: number; // resting rotation (deg)
-  sway: number; // wiggle amplitude (deg)
-  lift: number; // wiggle lift (px)
-  wd: number; // wiggle duration (s)
-  w: string; // polaroid width
-  aspect: string;
-  enter: Enter;
-  order: number; // reveal order → delay
-  shift?: string; // desktop sideways offset in the side columns
-}
-
-/** Hand-composed slots: varied sizes, tilts and entrances so it never looks like a grid of clones. */
-const SLOTS: Slot[] = [
-  // top (2)
-  { r: -6, sway: 1.6, lift: 4, wd: 6.2, w: "11.5rem", aspect: "4 / 5", enter: "enterTurn", order: 0 },
-  { r: 5, sway: 1.4, lift: 5, wd: 7.1, w: "11rem", aspect: "1 / 1", enter: "enterPop", order: 1 },
-  // left (3)
-  { r: 4, sway: 1.2, lift: 4, wd: 6.8, w: "12rem", aspect: "4 / 5", enter: "enterSide", order: 2, shift: "-1.5rem" },
-  { r: -5, sway: 1.5, lift: 6, wd: 7.6, w: "10.5rem", aspect: "1 / 1", enter: "enterSide", order: 5, shift: "1.5rem" },
-  { r: 3, sway: 1.3, lift: 4, wd: 6.4, w: "11.5rem", aspect: "4 / 5", enter: "enterSide", order: 8, shift: "-0.5rem" },
-  // right (3)
-  { r: -4, sway: 1.4, lift: 5, wd: 7.3, w: "11rem", aspect: "1 / 1", enter: "enterSide", order: 3, shift: "1.5rem" },
-  { r: 6, sway: 1.2, lift: 4, wd: 6.6, w: "12rem", aspect: "4 / 5", enter: "enterSide", order: 6, shift: "-1.5rem" },
-  { r: -3, sway: 1.6, lift: 6, wd: 7.9, w: "10.5rem", aspect: "4 / 5", enter: "enterSide", order: 9, shift: "0.5rem" },
-  // bottom (2 + up to 2 optional)
-  { r: -5, sway: 1.3, lift: 5, wd: 6.9, w: "11rem", aspect: "4 / 5", enter: "enterRise", order: 4 },
-  { r: 4, sway: 1.5, lift: 4, wd: 7.4, w: "11.5rem", aspect: "1 / 1", enter: "enterPop", order: 7 },
-  { r: -2, sway: 1.2, lift: 5, wd: 6.5, w: "10.5rem", aspect: "4 / 5", enter: "enterRise", order: 10 },
-  { r: 6, sway: 1.4, lift: 4, wd: 7.7, w: "11rem", aspect: "1 / 1", enter: "enterTurn", order: 11 },
-];
-
-const GROUPS = { top: [0, 1], left: [2, 3, 4], right: [5, 6, 7], bottom: [8, 9, 10, 11] } as const;
+const PHOTO_COUNT = 12;
 const REQUIRED_PHOTOS = 10;
+/** From this width the photos sit beside the letter (the 900px desktop preview qualifies). */
+const DESKTOP_MIN_PX = 880;
+
+function enterFor(group: Group, pos: number): Enter {
+  if (group === "left" || group === "right") return "enterSide";
+  const cycle: Enter[] = group === "top" ? ["enterTurn", "enterPop"] : ["enterRise", "enterPop", "enterTurn"];
+  return cycle[pos % cycle.length]!;
+}
 
 const OPEN_AT_MS = 1050;
 const BURST_CLEANUP_MS = 4200;
@@ -81,6 +59,8 @@ let tapId = 0;
 export function LetterForYouRenderer({ data, mode }: RendererProps<LetterForYouData>) {
   const [phase, setPhase] = useState<Phase>("closed");
   const [burst, setBurst] = useState(false);
+  const [layout, setLayout] = useState<Layout>("stack");
+  const [letterH, setLetterH] = useState(0);
   const [taps, setTaps] = useState<{ id: number; x: number; y: number; size: number }[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
   const letterRef = useRef<HTMLDivElement>(null);
@@ -92,6 +72,23 @@ export function LetterForYouRenderer({ data, mode }: RendererProps<LetterForYouD
   useEffect(() => {
     const list = timers.current;
     return () => list.forEach((t) => window.clearTimeout(t));
+  }, []);
+
+  // Measure the page width and the letter's real height (the scene is laid out, hidden,
+  // even before the envelope opens) so the photos can be arranged around it.
+  useEffect(() => {
+    const root = rootRef.current;
+    const letter = letterRef.current;
+    if (!root || !letter) return;
+    const measure = () => {
+      setLayout(root.offsetWidth >= DESKTOP_MIN_PX ? "desktop" : "stack");
+      setLetterH(letter.offsetHeight);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(root);
+    ro.observe(letter);
+    return () => ro.disconnect();
   }, []);
 
   const later = (fn: () => void, ms: number) => timers.current.push(window.setTimeout(fn, ms));
@@ -137,7 +134,19 @@ export function LetterForYouRenderer({ data, mode }: RendererProps<LetterForYouD
     [phase],
   );
 
-  const photos = SLOTS.map((_, i) => (data as Record<string, string | undefined>)[`photo_${i + 1}`]);
+  const photos = Array.from({ length: PHOTO_COUNT }, (_, i) => (data as Record<string, string | undefined>)[`photo_${i + 1}`]);
+  // Optional photos (11, 12) are simply left out when empty; in the editor preview,
+  // required ones show a placeholder so the composition is visible while uploading.
+  const shownKey = photos
+    .flatMap((src, i) => (src || (i < REQUIRED_PHOTOS && mode !== "live") ? [i] : []))
+    .join(",");
+  const placements = useMemo(() => {
+    const indices = shownKey ? shownKey.split(",").map(Number) : [];
+    return layout === "desktop" ? arrangeDesktop(indices, letterH) : arrangeStack(indices);
+  }, [layout, letterH, shownKey]);
+  const byGroup = (group: Group) => placements.filter((p) => p.group === group);
+  const top = byGroup("top");
+
   const greeting = data.greeting?.trim() || "Dear";
   const signOff = data.sign_off?.trim() || "With all my love,";
   const paragraphs = data.letter_body.split(/\n\s*\n/).filter((p) => p.trim());
@@ -145,30 +154,27 @@ export function LetterForYouRenderer({ data, mode }: RendererProps<LetterForYouD
   const TopFlower = FLOWER_SET[1]!;
   const Bud = FLOWER_SET[3]!;
 
-  function renderSlot(i: number) {
-    const src = photos[i];
-    // Optional photos (11, 12) are simply left out when empty; in the editor preview,
-    // required ones show a placeholder so the composition is visible while uploading.
-    if (!src && (i >= REQUIRED_PHOTOS || mode === "live")) return null;
-    const slot = SLOTS[i]!;
+  function renderPhoto(p: Placement, pos: number) {
+    const src = photos[p.index];
+    const look = PHOTO_STYLES[p.index % PHOTO_STYLES.length]!;
     const style = {
-      "--r": `${slot.r}deg`,
-      "--sway": `${slot.sway}deg`,
-      "--lift": `${slot.lift}px`,
-      "--wd": `${slot.wd}s`,
-      "--w": slot.w,
-      "--aspect": slot.aspect,
-      "--d": `${0.85 + slot.order * 0.12}s`,
-      "--shift": slot.shift ?? "0",
-      "--from-x": (GROUPS.right as readonly number[]).includes(i) ? "70px" : "-70px",
+      "--r": `${look.r}deg`,
+      "--sway": `${look.sway}deg`,
+      "--lift": `${look.lift}px`,
+      "--wd": `${look.wd}s`,
+      "--w": `${SIZE_REM[look.size]}rem`,
+      "--aspect": look.aspect,
+      "--d": `${0.85 + p.order * 0.12}s`,
+      "--from-x": p.group === "right" ? "70px" : "-70px",
+      "--align": p.align,
     } as CSSProperties;
     return (
-      <figure key={i} className={`${s.slot} ${s[slot.enter]}`} style={style}>
+      <figure key={p.index} className={`${s.slot} ${s[enterFor(p.group, pos)]}`} style={style}>
         <div className={s.polaroid}>
           {src ? (
-            <img className={s.photo} src={src} alt={`Memory ${i + 1}`} loading="eager" decoding="async" fetchPriority="low" />
+            <img className={s.photo} src={src} alt={`Memory ${p.index + 1}`} loading="eager" decoding="async" fetchPriority="low" />
           ) : (
-            <div className={s.placeholder}>Photo {i + 1}</div>
+            <div className={s.placeholder}>Photo {p.index + 1}</div>
           )}
         </div>
       </figure>
@@ -176,7 +182,7 @@ export function LetterForYouRenderer({ data, mode }: RendererProps<LetterForYouD
   }
 
   return (
-    <div ref={rootRef} className={s.root} data-phase={phase} style={vars} onPointerDown={onTap}>
+    <div ref={rootRef} className={s.root} data-phase={phase} data-layout={layout} style={vars} onPointerDown={onTap}>
       <div className={s.bgBase} aria-hidden />
       <div className={s.bgWarm} aria-hidden />
 
@@ -260,11 +266,11 @@ export function LetterForYouRenderer({ data, mode }: RendererProps<LetterForYouD
       {/* The letter and the memories around it */}
       <div className={s.scene} aria-hidden={phase !== "open"}>
         <div className={s.top}>
-          {renderSlot(0)}
+          {top[0] && renderPhoto(top[0], 0)}
           <span className={s.topFlower} aria-hidden>
             <TopFlower />
           </span>
-          {renderSlot(1)}
+          {top[1] && renderPhoto(top[1], 1)}
         </div>
 
         <div className={s.letterArea} data-no-hearts>
@@ -290,9 +296,9 @@ export function LetterForYouRenderer({ data, mode }: RendererProps<LetterForYouD
         </div>
 
         <div className={s.rest}>
-          <div className={s.left}>{GROUPS.left.map(renderSlot)}</div>
-          <div className={s.right}>{GROUPS.right.map(renderSlot)}</div>
-          <div className={s.bottom}>{GROUPS.bottom.map(renderSlot)}</div>
+          <div className={s.left}>{byGroup("left").map(renderPhoto)}</div>
+          <div className={s.right}>{byGroup("right").map(renderPhoto)}</div>
+          <div className={s.bottom}>{byGroup("bottom").map(renderPhoto)}</div>
           <span className={s.restFlower} aria-hidden>
             <Bud />
           </span>
