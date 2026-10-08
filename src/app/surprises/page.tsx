@@ -13,7 +13,7 @@ import { priceCentavos } from "@/lib/price";
 
 export const metadata: Metadata = { title: "Pick a Surprise" };
 
-const COMING = ["Birthday Surprise", "Love Letter", "Anniversary"];
+const COMING = ["Birthday Surprise", "Anniversary", "Best Friends"];
 
 export default function CatalogPage() {
   const templates = listedTemplates();

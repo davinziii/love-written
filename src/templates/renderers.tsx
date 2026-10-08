@@ -8,6 +8,7 @@ import type { ComponentType } from "react";
 import type { TemplateId } from "./index";
 import type { RendererProps } from "./types";
 import { OurStoryRenderer } from "./our-story/OurStoryRenderer";
+import { LetterForYouRenderer } from "./letter-for-you/LetterForYouRenderer";
 
 export type RenderData = Record<string, string | undefined>;
 type AnyRenderer = ComponentType<RendererProps<RenderData>>;
@@ -22,6 +23,7 @@ function register<D>(renderer: ComponentType<RendererProps<D>>): AnyRenderer {
 
 export const RENDERERS: Record<TemplateId, AnyRenderer> = {
   "our-story": register(OurStoryRenderer),
+  "letter-for-you": register(LetterForYouRenderer),
 };
 
 export function TemplateExperience({

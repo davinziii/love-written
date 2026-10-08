@@ -107,7 +107,7 @@ Available field types (`src/templates/types.ts`):
 | `image` | photo upload (auto-compressed) | — | `media` table |
 | `date` | date picker (`YYYY-MM-DD`) | — | `content` |
 | `color` | theme swatches | `options` (theme ids), `default` | `style` |
-| `font` | "Aa" type style cards | `options` (font ids), `default` | `style` |
+| `font` | font cards with a sample | `options` (font ids), `default`, `previewText` | `style` |
 | `music` | track picker (hidden while the library is empty) | `options` (track ids) | `style` |
 
 Themes, fonts and music tracks are curated in `src/templates/styles.ts`.
@@ -184,9 +184,10 @@ The renderer simply uses it:
 ```tsx
 export function OurStoryRenderer({ data, mode }: RendererProps<OurStoryData>) {
   const theme = getTheme(data.theme);
-  const font = getFont(data.font);
+  const story = getFont(data.story_font, "lora");
+  const final = getFont(data.final_font, "great_vibes");
   return (
-    <div style={themeVars(theme, font)}>
+    <div style={themeVars(theme, story, final)}>
       <h1>{data.recipient_name}</h1>          {/* text is rendered as text — never as HTML */}
       <p>{data.intro_message}</p>
       <img src={data.memory_photo_1} alt="" />
@@ -220,6 +221,7 @@ Create `src/templates/birthday-surprise/definition.ts`:
 
 ```ts
 import { defineTemplate, type TemplateData } from "../types";
+import { FINAL_FONT_IDS, STORY_FONT_IDS } from "../styles";
 
 export const birthdaySurpriseDefinition = defineTemplate({
   id: "birthday-surprise",
@@ -238,12 +240,13 @@ export const birthdaySurpriseDefinition = defineTemplate({
     { id: "wish", type: "textarea", label: "Your wish for them", group: "The Wish", required: true, maxLength: 300 },
     { id: "sender_name", type: "text", label: "From", group: "The Wish", required: true, maxLength: 40 },
     { id: "theme", type: "color", label: "Color theme", group: "Look & Feel", options: ["sunset", "lavender", "midnight"], default: "sunset" },
-    { id: "font", type: "font", label: "Type style", group: "Look & Feel", options: ["modern", "handwritten"], default: "modern" },
+    { id: "story_font", type: "font", label: "Story font", group: "Look & Feel", options: STORY_FONT_IDS, default: "nunito", previewText: "Happy birthday" },
+    { id: "final_font", type: "font", label: "Wish font", group: "The Wish", options: FINAL_FONT_IDS, default: "dancing", previewText: "Make a wish" },
   ],
   sample: {
     recipient_name: "Jamie", age: "30", birthday_message: "Thirty looks amazing on you…",
     favorite_photo: "/samples/memory-1.svg", wish: "More adventures.", sender_name: "Alex",
-    theme: "sunset", font: "modern",
+    theme: "sunset", story_font: "nunito", final_font: "dancing",
   },
 });
 
@@ -267,7 +270,11 @@ import type { BirthdaySurpriseData } from "./definition";
 import s from "./birthday-surprise.module.css";
 
 export function BirthdaySurpriseRenderer({ data }: RendererProps<BirthdaySurpriseData>) {
-  const vars = themeVars(getTheme(data.theme), getFont(data.font)) as CSSProperties;
+  const vars = themeVars(
+    getTheme(data.theme),
+    getFont(data.story_font, "nunito"),
+    getFont(data.final_font, "dancing"),
+  ) as CSSProperties;
   return (
     <div className={s.root} style={vars}>
       <section className={s.cover}>

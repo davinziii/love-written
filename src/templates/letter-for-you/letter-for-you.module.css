@@ -1,0 +1,845 @@
+/* A Letter for You — trusted template styles.
+   Colors come from the theme (--lw-*) via themeVars(); only transform/opacity animate. */
+
+.root {
+  --screen-h: var(--lw-screen-h, 100svh);
+  --spring: cubic-bezier(0.2, 1.25, 0.35, 1);
+  --soft: cubic-bezier(0.22, 0.8, 0.24, 1);
+  --paper: #fffdf8;
+  --env: color-mix(in srgb, var(--lw-glow) 45%, #fffaf6);
+  --env-dark: color-mix(in srgb, var(--lw-glow) 75%, #f3e4dc);
+  --lfy-flower-a: var(--lw-accent);
+  --lfy-flower-b: color-mix(in srgb, var(--lw-accent) 70%, #5a1830);
+  --lfy-flower-c: color-mix(in srgb, var(--lw-accent) 38%, #fff);
+  position: relative;
+  min-height: var(--screen-h);
+  color: var(--lw-ink);
+  font-family: var(--lw-story), Georgia, serif;
+  container-type: inline-size;
+  overflow-x: clip;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Background: neutral paper → slowly warms into the theme after opening ── */
+
+.bgBase,
+.bgWarm {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+}
+.bgBase {
+  background:
+    radial-gradient(60% 40% at 50% 35%, #fbf8f4, transparent 70%),
+    linear-gradient(#f5f0ea, #efe8e1);
+}
+.bgWarm {
+  opacity: 0;
+  transition: opacity 5s ease-in-out 0.4s;
+  background:
+    radial-gradient(70% 45% at 50% 18%, color-mix(in srgb, var(--lw-glow) 85%, transparent), transparent 70%),
+    radial-gradient(50% 35% at 12% 70%, color-mix(in srgb, var(--lw-glow) 55%, transparent), transparent 70%),
+    radial-gradient(50% 35% at 90% 85%, color-mix(in srgb, #ffd9c2 60%, transparent), transparent 70%),
+    linear-gradient(var(--lw-bg), color-mix(in srgb, var(--lw-bg) 85%, #fff));
+}
+.root[data-phase="open"] .bgWarm {
+  opacity: 1;
+}
+
+/* ── Cover: the envelope alone ──────────────────────────────────────────── */
+
+.cover {
+  position: relative;
+  z-index: 3;
+  min-height: var(--screen-h);
+  display: grid;
+  place-items: center;
+  padding: 2rem 1rem;
+}
+.root[data-phase="open"] .cover {
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--screen-h);
+  pointer-events: none;
+}
+
+.envelopeWrap {
+  display: grid;
+  justify-items: center;
+  gap: 1.6rem;
+}
+.root[data-phase="open"] .envelopeWrap {
+  animation: envDrop 0.9s var(--soft) forwards;
+}
+
+.envelope {
+  position: relative;
+  width: clamp(260px, 78cqi, 340px);
+  aspect-ratio: 3 / 2;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  perspective: 1200px;
+  animation: envFloat 5s ease-in-out infinite;
+  filter: drop-shadow(0 22px 26px rgb(70 40 40 / 0.16)) drop-shadow(0 4px 6px rgb(70 40 40 / 0.08));
+  transition: scale 0.4s var(--soft);
+}
+.envelope:hover {
+  scale: 1.03;
+}
+.envelope:focus-visible {
+  outline: 3px solid var(--lw-accent);
+  outline-offset: 10px;
+  border-radius: 10px;
+}
+.root[data-phase="opening"] .envelope,
+.root[data-phase="open"] .envelope {
+  animation: none;
+  cursor: default;
+}
+
+.envGlow {
+  position: absolute;
+  inset: -18%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--lw-glow) 70%, transparent), transparent);
+  animation: glowPulse 3.2s ease-in-out infinite;
+}
+
+.envBack,
+.envFront,
+.envFlap,
+.envPeek {
+  position: absolute;
+  inset: 0;
+}
+.envBack {
+  border-radius: 8px;
+  background: linear-gradient(160deg, var(--env-dark), color-mix(in srgb, var(--env-dark) 85%, #fff));
+}
+.envPeek {
+  inset: 8% 7% 10%;
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.04);
+  z-index: 1;
+}
+.envPeek::before {
+  content: "";
+  position: absolute;
+  inset: 18% 14% auto;
+  height: 46%;
+  background: repeating-linear-gradient(transparent 0 9px, color-mix(in srgb, var(--lw-accent) 18%, transparent) 9px 10px);
+  opacity: 0.6;
+}
+.envFront {
+  z-index: 2;
+}
+.envFront svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.envName {
+  position: absolute;
+  inset: auto 0 6%;
+  text-align: center;
+  font-family: var(--lw-final), cursive;
+  font-style: var(--lw-final-style, normal);
+  font-size: calc(clamp(1.1rem, 6cqi, 1.6rem) * var(--lw-final-scale, 1));
+  color: color-mix(in srgb, var(--lw-accent) 75%, #3b1f28);
+  pointer-events: none;
+}
+.envFlap {
+  z-index: 3;
+  transform-origin: 50% 0;
+  transform-style: preserve-3d;
+}
+.envFlap svg {
+  width: 100%;
+  height: 62%;
+  display: block;
+}
+.seal {
+  position: absolute;
+  left: 50%;
+  /* sits on the flap's tip (the flap is 62% tall, its point at ~93% of that) */
+  top: 57%;
+  translate: -50% -50%;
+  width: 16%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--lw-accent-ink);
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--lw-accent) 70%, #fff), var(--lw-accent) 55%, color-mix(in srgb, var(--lw-accent) 75%, #000));
+  box-shadow: 0 3px 6px rgb(0 0 0 / 0.2), inset 0 -2px 4px rgb(0 0 0 / 0.15);
+  z-index: 4;
+  transition: scale 0.25s ease, opacity 0.25s ease;
+}
+
+/* Opening choreography */
+.root[data-phase="opening"] .envFlap,
+.root[data-phase="open"] .envFlap {
+  animation: flapOpen 0.7s var(--soft) forwards;
+}
+.root[data-phase="opening"] .seal,
+.root[data-phase="open"] .seal {
+  scale: 0.2;
+  opacity: 0;
+}
+.root[data-phase="opening"] .envPeek,
+.root[data-phase="open"] .envPeek {
+  animation: peekRise 0.65s var(--soft) 0.42s forwards;
+}
+
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--lw-muted);
+  animation: hintBreath 2.6s ease-in-out infinite;
+}
+.root[data-phase="opening"] .hint,
+.root[data-phase="open"] .hint {
+  opacity: 0;
+  transition: opacity 0.3s;
+  animation: none;
+}
+
+/* ── Atmosphere (sticky, behind content) ───────────────────────────────── */
+
+.atmos {
+  position: sticky;
+  top: 0;
+  height: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.atmosInner {
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--screen-h);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 2s ease 1.2s;
+}
+.root[data-phase="open"] .atmosInner {
+  opacity: 1;
+}
+.floatHeart {
+  position: absolute;
+  bottom: -40px;
+  color: var(--lw-accent);
+  animation: heartRise var(--t) linear var(--d) infinite;
+}
+
+/* ── Flower burst ──────────────────────────────────────────────────────── */
+
+.burst {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--screen-h) * 0.52);
+  width: 0;
+  height: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+.flower {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--size);
+  height: var(--size);
+  opacity: 0;
+  animation: flowerArc var(--dur) var(--delay) both;
+}
+.flower svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ── Scene: letter + photos ────────────────────────────────────────────── */
+
+.scene {
+  display: none;
+  position: relative;
+  z-index: 2;
+  max-width: 78rem;
+  margin: 0 auto;
+  padding: clamp(1.5rem, 5cqi, 3.5rem) 1rem 1.5rem;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "top" "letter" "rest";
+  gap: 1.5rem;
+}
+.root[data-phase="open"] .scene {
+  display: grid;
+}
+
+.top {
+  grid-area: top;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  align-items: end;
+  padding: 0 0.5rem;
+}
+.topFlower {
+  display: none;
+}
+.rest {
+  grid-area: rest;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.1rem 0.9rem;
+  padding: 0 0.25rem;
+}
+.left,
+.right,
+.bottom {
+  display: contents;
+}
+
+/* Letter */
+.letterArea {
+  grid-area: letter;
+  position: relative;
+  justify-self: center;
+  width: min(100%, 34rem);
+  opacity: 0;
+}
+.root[data-phase="open"] .letterArea {
+  animation: letterRise 1.15s var(--spring) 0.05s forwards;
+}
+.letterShadow {
+  filter: drop-shadow(0 2px 3px rgb(60 30 30 / 0.07)) drop-shadow(0 26px 40px rgb(60 30 30 / 0.22));
+  transition: filter 0.5s var(--soft), translate 0.5s var(--soft), rotate 0.5s var(--soft);
+  rotate: -0.8deg;
+}
+@media (hover: hover) {
+  .letterShadow:hover {
+    translate: 0 -4px;
+    rotate: -0.2deg;
+    filter: drop-shadow(0 3px 4px rgb(60 30 30 / 0.08)) drop-shadow(0 36px 50px rgb(60 30 30 / 0.26));
+  }
+}
+.letter {
+  position: relative;
+  padding: clamp(1.8rem, 6cqi, 3.2rem) clamp(1.4rem, 6cqi, 3.2rem) clamp(1.8rem, 5cqi, 2.8rem);
+  background:
+    radial-gradient(rgb(150 115 95 / 0.05) 1px, transparent 1.2px) 0 0 / 5px 5px,
+    radial-gradient(120% 80% at 50% 0%, #fffefb, transparent 60%),
+    linear-gradient(170deg, var(--paper), #fbf3ea);
+  /* Slightly imperfect, hand-torn edges */
+  clip-path: polygon(0.6% 0.9%, 18% 0.2%, 41% 0.8%, 63% 0.1%, 86% 0.7%, 99.5% 0.3%, 99.1% 22%, 99.7% 48%, 99.2% 76%, 99.6% 99.4%, 74% 99.8%, 52% 99.2%, 27% 99.9%, 0.4% 99.3%, 0.9% 71%, 0.2% 44%, 0.8% 19%);
+  line-height: 1.85;
+  font-size: calc(1.04rem * var(--lw-story-scale, 1));
+}
+.letter:focus {
+  outline: none;
+}
+.greeting {
+  font-family: var(--lw-final), cursive;
+  font-style: var(--lw-final-style, normal);
+  font-size: calc(clamp(1.9rem, 8cqi, 2.6rem) * var(--lw-final-scale, 1));
+  line-height: 1.2;
+  color: color-mix(in srgb, var(--lw-accent) 80%, #3b1f28);
+  margin: 0 0 1.1rem;
+  overflow-wrap: anywhere;
+}
+.para {
+  margin: 0 0 1.05em;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.closing {
+  margin-top: 1.6em;
+}
+.signOff {
+  margin: 1.8em 0 0;
+  font-style: italic;
+  color: var(--lw-muted);
+}
+.signature {
+  margin: 0.1em 0 0;
+  font-family: var(--lw-final), cursive;
+  font-style: var(--lw-final-style, normal);
+  font-size: calc(clamp(2rem, 8cqi, 2.7rem) * var(--lw-final-scale, 1));
+  line-height: 1.15;
+  color: color-mix(in srgb, var(--lw-accent) 85%, #3b1f28);
+  overflow-wrap: anywhere;
+}
+.pinFlower {
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  left: -18px;
+  top: -24px;
+  rotate: -18deg;
+  z-index: 2;
+  filter: drop-shadow(0 4px 6px rgb(0 0 0 / 0.15));
+}
+.pinFlower svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Photos */
+.slot {
+  position: relative;
+  /* The slot owns the size; never wider than its column. */
+  width: min(100%, var(--w, 11rem));
+  justify-self: center;
+  opacity: 0;
+}
+.root[data-phase="open"] .slot {
+  animation-duration: 0.95s;
+  animation-delay: var(--d);
+  animation-fill-mode: forwards;
+  animation-timing-function: var(--soft);
+}
+/* Entrance styles (one class per photo, so not every photo arrives the same way). */
+.root[data-phase="open"] .enterRise {
+  animation-name: enterRise;
+}
+.root[data-phase="open"] .enterTurn {
+  animation-name: enterTurn;
+  animation-timing-function: var(--spring);
+}
+.root[data-phase="open"] .enterPop {
+  animation-name: enterPop;
+  animation-timing-function: var(--spring);
+}
+.root[data-phase="open"] .enterSide {
+  animation-name: enterSide;
+}
+.polaroid {
+  width: 100%;
+  padding: 7px 7px 24px;
+  background: #fffdfa;
+  border-radius: 3px;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.08),
+    0 14px 26px -12px rgb(60 30 30 / 0.35);
+  transform: rotate(var(--r));
+}
+.root[data-phase="open"] .polaroid {
+  animation: wiggle var(--wd) ease-in-out calc(var(--d) + 0.95s) infinite alternate;
+}
+.photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: var(--aspect, 4 / 5);
+  object-fit: cover;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--lw-glow) 40%, #fff);
+}
+.placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: var(--aspect, 4 / 5);
+  border: 2px dashed color-mix(in srgb, var(--lw-muted) 35%, transparent);
+  border-radius: 2px;
+  color: var(--lw-muted);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 0.72rem;
+  background: color-mix(in srgb, var(--lw-glow) 25%, #fff);
+}
+.restFlower {
+  display: grid;
+  place-items: center;
+  opacity: 0;
+}
+.restFlower svg {
+  width: 54px;
+  height: 54px;
+}
+.root[data-phase="open"] .restFlower {
+  animation: popIn 0.9s var(--spring) 2.4s forwards;
+}
+
+/* Tap hearts */
+.tapHeart {
+  position: absolute;
+  z-index: 8;
+  color: var(--lw-accent);
+  pointer-events: none;
+  translate: -50% -50%;
+  animation: tapPop 0.95s var(--soft) forwards;
+}
+
+/* Footer */
+.footer {
+  position: relative;
+  z-index: 2;
+  padding: 2.5rem 1.5rem 3rem;
+  text-align: center;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 0.8rem;
+  color: var(--lw-muted);
+  display: none;
+}
+.root[data-phase="open"] .footer {
+  display: block;
+  opacity: 0;
+  animation: fadeIn 1s ease 3.2s forwards;
+}
+.footer a {
+  color: var(--lw-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ── Tablet: photos in three columns below the letter ──────────────────── */
+
+@container (min-width: 640px) {
+  .top {
+    grid-template-columns: auto auto auto;
+    justify-content: center;
+    gap: clamp(1.5rem, 6cqi, 4rem);
+    align-items: center;
+  }
+  .top .slot {
+    width: var(--w);
+  }
+  .topFlower {
+    display: grid;
+    place-items: center;
+    opacity: 0;
+  }
+  .topFlower svg {
+    width: 56px;
+    height: 56px;
+  }
+  .root[data-phase="open"] .topFlower {
+    animation: popIn 0.9s var(--spring) 2.2s forwards;
+  }
+  .rest {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.6rem 1.2rem;
+    max-width: 44rem;
+    justify-self: center;
+    width: 100%;
+  }
+  .restFlower {
+    display: none;
+  }
+}
+
+/* ── Desktop composition: photos around the letter ─────────────────────── */
+
+@container (min-width: 1000px) {
+  .scene {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 30rem) minmax(0, 1fr);
+    grid-template-areas:
+      "top top top"
+      "left letter right"
+      "bottom bottom bottom";
+    column-gap: clamp(1.5rem, 4cqi, 3.5rem);
+    row-gap: 2.2rem;
+    align-items: center;
+    padding-top: 3rem;
+  }
+  .top {
+    gap: clamp(2rem, 6cqi, 5rem);
+  }
+  .topFlower svg {
+    width: 68px;
+    height: 68px;
+  }
+  .rest {
+    display: contents;
+  }
+  .left,
+  .right {
+    display: grid;
+    gap: 1.8rem;
+    align-content: center;
+  }
+  .left {
+    grid-area: left;
+    justify-items: end;
+  }
+  .right {
+    grid-area: right;
+    justify-items: start;
+  }
+  .left .slot,
+  .right .slot {
+    width: min(100%, var(--w));
+  }
+  .left .slot {
+    justify-self: end;
+  }
+  .right .slot {
+    justify-self: start;
+  }
+  .bottom {
+    grid-area: bottom;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: clamp(1.5rem, 4cqi, 3rem);
+  }
+  .bottom .slot {
+    width: var(--w);
+  }
+  .bottom .slot:nth-child(even) {
+    margin-top: 2.2rem;
+  }
+  .restFlower {
+    display: none;
+  }
+  .envelope {
+    width: 400px;
+  }
+  .pinFlower {
+    width: 78px;
+    height: 78px;
+    left: -30px;
+    top: -30px;
+  }
+}
+
+/* Wide screens: room for a little sideways scatter in the side columns. */
+@container (min-width: 1200px) {
+  .scene {
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 32rem) minmax(0, 1fr);
+  }
+  .left .slot,
+  .right .slot {
+    translate: var(--shift, 0) 0;
+  }
+}
+
+/* ── Keyframes ─────────────────────────────────────────────────────────── */
+
+@keyframes envFloat {
+  50% {
+    translate: 0 -8px;
+    rotate: -0.6deg;
+  }
+}
+@keyframes glowPulse {
+  50% {
+    opacity: 0.55;
+    scale: 1.06;
+  }
+}
+@keyframes hintBreath {
+  50% {
+    opacity: 0.55;
+  }
+}
+@keyframes flapOpen {
+  0% {
+    transform: rotateX(0deg);
+    z-index: 3;
+  }
+  55% {
+    z-index: 3;
+  }
+  56% {
+    z-index: 0;
+  }
+  100% {
+    transform: rotateX(180deg);
+    z-index: 0;
+  }
+}
+@keyframes peekRise {
+  to {
+    transform: translateY(-42%);
+  }
+}
+@keyframes envDrop {
+  0% {
+    transform: none;
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(38%) scale(0.86);
+    opacity: 0;
+  }
+}
+@keyframes letterRise {
+  0% {
+    opacity: 0;
+    transform: translateY(150px) scale(0.86) rotate(-5deg);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes flowerArc {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) rotate(0deg) scale(0.35);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.35, 1);
+  }
+  8% {
+    opacity: 1;
+  }
+  45% {
+    transform: translate(calc(-50% + var(--x) * 0.62), calc(var(--peak) * -1)) rotate(calc(var(--rot) * 0.45)) scale(1);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.8, 0.45);
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--x)), var(--fall)) rotate(var(--rot)) scale(0.92);
+  }
+}
+@keyframes heartRise {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.7);
+    opacity: 0;
+  }
+  15% {
+    opacity: var(--o);
+  }
+  85% {
+    opacity: var(--o);
+  }
+  100% {
+    transform: translate3d(var(--x), calc(var(--screen-h) * -1 - 60px), 0) scale(1);
+    opacity: 0;
+  }
+}
+@keyframes enterRise {
+  from {
+    opacity: 0;
+    transform: translateY(46px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes enterTurn {
+  from {
+    opacity: 0;
+    transform: rotate(-14deg) scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes enterPop {
+  from {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes enterSide {
+  from {
+    opacity: 0;
+    transform: translateX(var(--from-x, -60px)) rotate(4deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes wiggle {
+  0% {
+    transform: rotate(var(--r)) translateY(0);
+  }
+  50% {
+    transform: rotate(calc(var(--r) + var(--sway))) translateY(calc(var(--lift) * -1));
+  }
+  100% {
+    transform: rotate(calc(var(--r) - var(--sway) * 0.6)) translateY(0);
+  }
+}
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.4) rotate(-20deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tapPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-46px) scale(0.9);
+  }
+}
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Reduced motion: everything simply appears ─────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .envelope,
+  .envGlow,
+  .hint {
+    animation: none !important;
+  }
+  .root[data-phase] .envFlap,
+  .root[data-phase] .envPeek,
+  .root[data-phase] .envelopeWrap {
+    animation: none !important;
+  }
+  .root[data-phase="open"] .cover {
+    display: none;
+  }
+  .root[data-phase="open"] .letterArea,
+  .root[data-phase="open"] .slot,
+  .root[data-phase="open"] .topFlower,
+  .root[data-phase="open"] .restFlower,
+  .root[data-phase="open"] .footer {
+    animation: none !important;
+    opacity: 1;
+  }
+  .root[data-phase="open"] .polaroid {
+    animation: none !important;
+  }
+  .bgWarm {
+    transition: none;
+  }
+  .atmos,
+  .burst,
+  .tapHeart {
+    display: none;
+  }
+  .letterShadow {
+    transition: none;
+  }
+}
