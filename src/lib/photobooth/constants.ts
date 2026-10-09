@@ -15,8 +15,8 @@ export const PRESENCE_TIMEOUT_MS = 15_000;
  */
 export const RECONNECT_WINDOW_MS = 5 * 60_000;
 
-/** "Both ready" → shutter. Long enough for both phones to receive the time, even by polling. */
-export const COUNTDOWN_LEAD_MS = 5_000;
+/** "Both ready" → shutter. Long enough for both phones to receive the time — even on slow mobile data — and still see 3 · 2 · 1. */
+export const COUNTDOWN_LEAD_MS = 6_500;
 
 /** A countdown whose photos never all arrived is restarted after this long. */
 export const CAPTURE_GRACE_SECONDS = 45;

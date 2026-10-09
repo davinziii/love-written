@@ -47,7 +47,7 @@ export function SplitView({
 }: {
   camera: Camera;
   role: "A" | "B";
-  live: { status: LiveStatus; remote: MediaStream | null };
+  live: { status: LiveStatus; remote: MediaStream | null; retry?: () => void };
   partnerName?: string;
   children?: ReactNode;
 }) {
@@ -71,7 +71,7 @@ function SelfTile({ attach, status }: { attach: Camera["attach"]; status: Camera
   );
 }
 
-function PartnerTile({ live, name }: { live: { status: LiveStatus; remote: MediaStream | null }; name: string }) {
+function PartnerTile({ live, name }: { live: { status: LiveStatus; remote: MediaStream | null; retry?: () => void }; name: string }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const v = ref.current;
@@ -86,7 +86,14 @@ function PartnerTile({ live, name }: { live: { status: LiveStatus; remote: Media
       {!showing && (
         <div className="absolute inset-0 grid place-items-center p-3 text-center text-xs leading-snug text-white/75">
           {live.status === "unavailable" ? (
-            <span>Live view isn&rsquo;t available on this connection — you can still take photos together.</span>
+            <span className="flex flex-col items-center gap-2">
+              <span>Live view couldn&rsquo;t connect on this network — you can still take photos together.</span>
+              {live.retry && (
+                <button type="button" onClick={live.retry} className="pointer-events-auto rounded-full bg-white/90 px-3 py-1 text-[11px] font-medium text-ink">
+                  Try again
+                </button>
+              )}
+            </span>
           ) : live.status === "partner-paused" ? (
             <span>{name} paused their video — they may have stepped away. You can still chat.</span>
           ) : live.status === "off" ? (

@@ -10,6 +10,10 @@ export type LiveStatus = "off" | "connecting" | "connected" | "unavailable" | "p
 const PREVIEW_ENCODING = { maxBitrate: 700_000, scaleResolutionDownBy: 2 };
 const GATHER_TIMEOUT_MS = 4000;
 const MAX_TRIES = 4;
+/** After both sides exchanged details, a link that isn't up within this time counts as failed. */
+const CONNECT_TIMEOUT_MS = 20_000;
+/** B asked for a fresh offer after a failure: if none comes (A gave up), count another failure. */
+const OFFER_WAIT_MS = 30_000;
 
 /**
  * The live view between the two browsers (WebRTC). Video only — no sound — sent directly
@@ -29,6 +33,7 @@ class LiveLink {
   private handledRequest: string | null = null;
   private tries = 0;
   private timer: number | undefined;
+  private connectTimer: number | undefined;
   private active = false;
 
   constructor(
@@ -46,12 +51,22 @@ class LiveLink {
     this.tries = 0;
     this.onStatus("connecting");
     if (this.role === "A") void this.offer();
-    else void this.api.send({ type: "request", epoch: crypto.randomUUID() }); // "I'm here — send me an offer"
+    else void this.api.send({ type: "request", epoch: crypto.randomUUID(), reason: "hello" }); // "I'm here — send me an offer"
+  }
+
+  /** "Try again" after giving up. */
+  retry() {
+    if (!this.active) return;
+    this.tries = 0;
+    this.onStatus("connecting");
+    if (this.role === "A") void this.offer();
+    else void this.api.send({ type: "request", epoch: crypto.randomUUID(), reason: "hello" });
   }
 
   stop() {
     this.active = false;
     window.clearTimeout(this.timer);
+    window.clearTimeout(this.connectTimer);
     this.pc?.close();
     this.pc = null;
     this.onRemote(null);
@@ -84,11 +99,20 @@ class LiveLink {
     }
     if (this.role === "A") {
       if (signal.type === "answer" && signal.epoch === this.epoch && this.pc?.signalingState === "have-local-offer") {
-        void this.pc.setRemoteDescription({ type: "answer", sdp: signal.sdp ?? "" }).catch(() => this.failed());
+        const conn = this.pc;
+        void conn
+          .setRemoteDescription({ type: "answer", sdp: signal.sdp ?? "" })
+          .then(() => this.watchConnect(conn))
+          .catch(() => this.failed());
       } else if (signal.type === "request" && signal.epoch !== this.handledRequest) {
         this.handledRequest = signal.epoch;
-        this.tries = 0;
-        void this.offer();
+        if (signal.reason === "retry") {
+          // B's attempt failed: count it like our own failure (so it can't loop forever).
+          this.failed();
+        } else {
+          this.tries = 0;
+          void this.offer();
+        }
       }
     } else if (signal.type === "offer" && signal.epoch !== this.epoch) {
       void this.answer(signal).catch(() => this.failed());
@@ -109,6 +133,7 @@ class LiveLink {
       if (this.pc !== conn) return;
       if (conn.connectionState === "connected") {
         this.tries = 0;
+        window.clearTimeout(this.connectTimer);
         this.onStatus("connected");
       } else if (conn.connectionState === "failed") {
         this.failed();
@@ -135,19 +160,32 @@ class LiveLink {
     });
   }
 
+  /** Both sides have each other's details: if the link isn't up soon, count a failure. */
+  private watchConnect(conn: RTCPeerConnection) {
+    window.clearTimeout(this.connectTimer);
+    this.connectTimer = window.setTimeout(() => {
+      if (this.pc === conn && conn.connectionState !== "connected") this.failed();
+    }, CONNECT_TIMEOUT_MS);
+  }
+
   private failed() {
     if (!this.active) return;
-    this.onStatus("connecting");
-    if (this.role === "B") {
-      // A drives retries; B just asks for a fresh offer.
-      void this.api.send({ type: "request", epoch: crypto.randomUUID() });
-      return;
-    }
+    window.clearTimeout(this.connectTimer);
     this.tries++;
     if (this.tries >= MAX_TRIES) {
+      // Give up quietly — photos work without the live view. "Try again" restarts.
       this.pc?.close();
       this.pc = null;
       this.onStatus("unavailable");
+      return;
+    }
+    this.onStatus("connecting");
+    if (this.role === "B") {
+      // A drives the retries; B tells A this attempt failed and waits for a fresh offer —
+      // but not forever (A may have given up too).
+      void this.api.send({ type: "request", epoch: crypto.randomUUID(), reason: "retry" });
+      window.clearTimeout(this.timer);
+      this.timer = window.setTimeout(() => this.failed(), OFFER_WAIT_MS);
       return;
     }
     window.clearTimeout(this.timer);
@@ -176,6 +214,7 @@ class LiveLink {
   }
 
   private async answer(signal: RtcSignal) {
+    window.clearTimeout(this.timer); // the offer we were waiting for arrived
     const conn = await this.connection();
     this.epoch = signal.epoch;
     await conn.setRemoteDescription({ type: "offer", sdp: signal.sdp ?? "" });
@@ -200,6 +239,7 @@ class LiveLink {
       // full-quality preview is fine too
     }
     await this.api.send({ type: "answer", sdp: conn.localDescription?.sdp ?? "", epoch: signal.epoch });
+    this.watchConnect(conn);
   }
 }
 
@@ -264,6 +304,7 @@ export function useLiveVideo({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- react once per distinct signal
   }, [link, ready, sigKey]);
 
-  if (!supported && enabled) return { status: "unavailable" as LiveStatus, remote: null };
-  return { status: ready ? status : ("off" as LiveStatus), remote: ready ? remote : null };
+  const retry = () => link.retry();
+  if (!supported && enabled) return { status: "unavailable" as LiveStatus, remote: null, retry };
+  return { status: ready ? status : ("off" as LiveStatus), remote: ready ? remote : null, retry };
 }

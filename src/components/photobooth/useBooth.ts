@@ -6,6 +6,8 @@ import { boothApi, readBoothToken } from "@/lib/photobooth/client";
 import type { BoothState } from "@/lib/photobooth/types";
 
 export type BoothLoadError = { code: string; message: string };
+/** How this browser's connection to us is doing (from request round trips). */
+export type ConnectionQuality = "good" | "slow" | "weak";
 
 /**
  * Keeps this browser in sync with the server (the source of truth):
@@ -25,6 +27,8 @@ export function useBooth(sessionId: string, { slow = false }: { slow?: boolean }
   const [loadError, setLoadError] = useState<BoothLoadError | null>(null);
   const [offline, setOffline] = useState(false);
   const [live, setLive] = useState(false);
+  const [quality, setQuality] = useState<ConnectionQuality>("good");
+  const rttAvg = useRef<number | null>(null);
   const offset = useRef<{ ms: number; rtt: number }>({ ms: 0, rtt: Infinity });
   const inFlight = useRef<Promise<void> | null>(null);
   const again = useRef(false);
@@ -39,16 +43,22 @@ export function useBooth(sessionId: string, { slow = false }: { slow?: boolean }
     const readOnce = async () => {
       const t0 = Date.now();
       try {
-        const next = await boothApi<BoothState>(sessionId, token, "", { retries: 1 });
+        // Short timeout: a hung read must never block the next ones (state would freeze).
+        const next = await boothApi<BoothState>(sessionId, token, "", { retries: 1, timeoutMs: 8_000 });
         const t1 = Date.now();
         // Keep the offset from the fastest round trip seen (least network noise).
         const rtt = t1 - t0;
+        rttAvg.current = rttAvg.current === null ? rtt : rttAvg.current * 0.7 + rtt * 0.3;
+        setQuality(rttAvg.current < 600 ? "good" : rttAvg.current < 1500 ? "slow" : "weak");
         if (rtt <= offset.current.rtt + 40) offset.current = { ms: next.serverNow - (t0 + t1) / 2, rtt: Math.min(rtt, offset.current.rtt) };
         setState(next);
         setLoadError(null);
         setOffline(false);
       } catch (err) {
-        if (err instanceof ClientApiError && err.code === "NETWORK") setOffline(true);
+        if (err instanceof ClientApiError && err.code === "NETWORK") {
+          setOffline(true);
+          setQuality("weak");
+        }
         else if (err instanceof ClientApiError && (err.status === 404 || err.status === 409 || err.status === 429)) {
           setLoadError({ code: err.code, message: err.message });
         }
@@ -77,10 +87,12 @@ export function useBooth(sessionId: string, { slow = false }: { slow?: boolean }
 
   useEffect(() => {
     if (!token || status === "COMPLETED" || status === "EXPIRED" || status === "DELETED") return;
-    const base =
-      status === "IN_PROGRESS" ? (phase === "COUNTDOWN" ? 1000 : 1500) : status === "GENERATING" ? 2000 : status === "AWAITING_PAYMENT" ? 4000 : 2500;
+    // While getting ready / counting down, check every second even with Realtime, so a
+    // missed nudge on weak mobile data can't make someone learn about the countdown late.
+    const critical = status === "IN_PROGRESS" && (phase === "READY" || phase === "COUNTDOWN");
+    const base = critical ? 1000 : status === "IN_PROGRESS" ? 1500 : status === "GENERATING" ? 2000 : status === "AWAITING_PAYMENT" ? 4000 : 2500;
     // Away (idle / paused): check rarely — saves requests while nobody is looking.
-    const every = slow ? 10_000 : live ? Math.min(base * 2, 5000) : base;
+    const every = slow ? 10_000 : live && !critical ? Math.min(base * 2, 5000) : base;
     const id = window.setInterval(() => {
       if (document.visibilityState === "visible") void refresh();
     }, every);
@@ -127,14 +139,14 @@ export function useBooth(sessionId: string, { slow = false }: { slow?: boolean }
     };
   }, [realtimeKey, refresh]);
 
-  /** Perform an action, then re-read the state. */
+  /** Perform an action, then re-read the state (without waiting on that read — buttons free up at once). */
   const act = useCallback(
     async (path: string, body: unknown, retries = 1) => {
       if (!token) return;
       try {
         await boothApi(sessionId, token, path, { method: "POST", body, retries });
       } finally {
-        await refresh();
+        void refresh();
       }
     },
     [sessionId, token, refresh],
@@ -143,7 +155,7 @@ export function useBooth(sessionId: string, { slow = false }: { slow?: boolean }
   /** Server time now, in this browser's clock terms. */
   const serverNow = useCallback(() => Date.now() + offset.current.ms, []);
 
-  return { token, state, loadError, offline, live, refresh, act, serverNow };
+  return { token, state, loadError, offline, live, quality, refresh, act, serverNow };
 }
 
 export type Booth = ReturnType<typeof useBooth>;

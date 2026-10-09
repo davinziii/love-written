@@ -73,7 +73,7 @@ export function BoothChat({
           <Bubble key={m.clientId} mine body={m.body} faded />
         ))}
       </div>
-      <div className="flex gap-1.5 overflow-x-auto px-3 pb-2 [scrollbar-width:none]">
+      <div className="flex flex-wrap gap-1.5 px-3 pb-2">
         {QUICK.map((q) => (
           <button
             key={q}

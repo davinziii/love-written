@@ -55,7 +55,7 @@ export function boothApi<T>(
   sessionId: string,
   token: string,
   path: string,
-  opts: { method?: string; body?: unknown; retries?: number } = {},
+  opts: { method?: string; body?: unknown; retries?: number; timeoutMs?: number } = {},
 ): Promise<T> {
   return api<T>(`/api/photobooth/${sessionId}${path}`, {
     ...opts,

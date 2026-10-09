@@ -15,7 +15,7 @@ import { PHOTOBOOTH_RETENTION_DAYS, PHOTOBOOTH_TIMEZONE, RECONNECT_WINDOW_MS } f
 import type { BoothState, CameraIssue, StripFilter } from "@/lib/photobooth/types";
 import { formatPeso } from "@/lib/format";
 import { DEFAULT_FRAME_ID, FRAMES, getFrame } from "@/photobooth/frames";
-import { useBooth } from "./useBooth";
+import { useBooth, type ConnectionQuality } from "./useBooth";
 import { useCamera, type Camera } from "./useCamera";
 import { useLiveVideo, type LiveStatus } from "./useLiveVideo";
 import { useIdle } from "./useIdle";
@@ -122,7 +122,7 @@ export function BoothApp({ sessionId, justPaid, cancelled }: { sessionId: string
 }
 
 type Booth = ReturnType<typeof useBooth>;
-type Live = { status: LiveStatus; remote: MediaStream | null };
+type Live = { status: LiveStatus; remote: MediaStream | null; retry?: () => void };
 type ScreenProps = {
   booth: Booth;
   state: BoothState;
@@ -218,6 +218,22 @@ function AwayPrompt({ state, onHere }: { state: "asking" | "paused"; onHere: () 
         </button>
       </div>
     </div>
+  );
+}
+
+/** How this person's connection is doing — so a slow phone knows why things lag. */
+function ConnectionBadge({ quality }: { quality: ConnectionQuality }) {
+  const look = {
+    good: { dot: "bg-emerald-500", text: "Good connection", hint: "" },
+    slow: { dot: "bg-amber-400", text: "Slow connection", hint: "The countdown may feel short — Wi-Fi helps." },
+    weak: { dot: "bg-danger", text: "Weak connection", hint: "Things may lag. Try Wi-Fi or a spot with better signal." },
+  }[quality];
+  return (
+    <p className="flex items-center justify-center gap-1.5 text-xs text-ink-soft" role="status">
+      <span className={`h-2 w-2 shrink-0 rounded-full ${look.dot}`} aria-hidden />
+      <span className="font-medium text-ink">{look.text}</span>
+      {look.hint && <span className="hidden sm:inline">· {look.hint}</span>}
+    </p>
   );
 }
 
@@ -323,6 +339,7 @@ function Lobby({ booth, state, camera, live, myLink, onAway }: ScreenProps) {
   const partnerName = partner.name ?? "your person";
   const [busy, setBusy] = useState(false);
   const [agree, setAgree] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const reported = useRef<CameraIssue | null>(null);
 
@@ -387,15 +404,60 @@ function Lobby({ booth, state, camera, live, myLink, onAway }: ScreenProps) {
     );
   }
 
+  // Person A starts the photobooth (after reading the 7-day rule); Person B waits for them.
+  const partnerSet = partner.joined && partner.connected && partner.cameraReady;
   const waitingFor = !partner.joined
     ? `Waiting for ${partnerName}…`
     : !partner.name
       ? "They're opening the photobooth…"
       : !partner.cameraReady
-        ? `Waiting for ${partnerName} to enable their camera…`
-        : !partner.acknowledged
-          ? `Waiting for ${partnerName} to read the photo notice…`
-          : `${partner.name} is ready ❤️`;
+        ? `Waiting for ${partnerName} to turn on their camera…`
+        : me.role === "B"
+          ? `${partner.name} will start the photobooth ❤️`
+          : `${partner.name} is here and ready ❤️`;
+
+  const startCard =
+    me.role === "A" ? (
+      me.acknowledged ? (
+        <Card className="text-center">
+          <p className="font-medium">Starting as soon as {partnerName}&rsquo;s camera is on…</p>
+        </Card>
+      ) : showRules ? (
+        <Card className={`ring-2 ring-rose shadow-[0_18px_40px_-20px_rgba(196,72,106,0.6)] ${s.enter}`}>
+          <h2 className="font-display text-2xl">Before you start: your photos are temporary.</h2>
+          <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+            Once your photobooth is completed, your photos and photobooth strip will be available for {PHOTOBOOTH_RETENTION_DAYS} days. After that,
+            they will be <strong className="text-ink">permanently deleted</strong>. Download your photos before they expire.
+          </p>
+          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-white p-3 text-sm ring-1 ring-line">
+            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-rose" />
+            <span>I understand that our photos will be deleted after {PHOTOBOOTH_RETENTION_DAYS} days.</span>
+          </label>
+          <div className="mt-3 grid grid-cols-[auto_1fr] gap-2">
+            <Button variant="secondary" onClick={() => setShowRules(false)}>
+              Back
+            </Button>
+            <Button disabled={!agree} busy={busy} busyLabel="Starting…" onClick={() => void send({ acknowledge: true, ...(state.frameId ? {} : { frameId: DEFAULT_FRAME_ID }) })}>
+              Start the photobooth 📸
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          <Button className="w-full py-4 text-lg" disabled={!partnerSet} onClick={() => setShowRules(true)}>
+            Let&rsquo;s Start!
+          </Button>
+          {!partnerSet && <p className="text-center text-xs text-ink-soft">You can start once {partnerName} is here with their camera on.</p>}
+        </div>
+      )
+    ) : (
+      <Card className="text-center">
+        <p className="font-medium">Waiting for {partner.name ?? "your person"} to start the photobooth…</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
+          Heads up: once you&rsquo;re done, your photos stay downloadable for {PHOTOBOOTH_RETENTION_DAYS} days, then they&rsquo;re permanently deleted.
+        </p>
+      </Card>
+    );
 
   return (
     <div className="space-y-4">
@@ -405,34 +467,16 @@ function Lobby({ booth, state, camera, live, myLink, onAway }: ScreenProps) {
         <SplitView camera={camera} role={me.role} live={live} partnerName={partner.name ?? "Your person"} />
       )}
 
+      {startCard}
+
       <Card>
         <PartnerStatus partner={partner} waitingFor={waitingFor} />
+        <div className="mt-2 border-t border-line pt-2">
+          <ConnectionBadge quality={booth.quality} />
+        </div>
       </Card>
 
       {me.role === "A" && state.inviteLink && <InviteCard link={state.inviteLink} joined={partner.joined} myName={me.name} />}
-
-      <Card>
-        <h2 className="font-display text-xl">Your photos are temporary.</h2>
-        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-          Once your photobooth is completed, your photos and photobooth strip will be available for {PHOTOBOOTH_RETENTION_DAYS} days. After that,
-          they will be <strong className="text-ink">permanently deleted</strong>. Download your photos before they expire.
-        </p>
-        {me.acknowledged ? (
-          <p className="mt-3 flex items-center gap-2 text-sm font-medium text-emerald-700">
-            <Icon.check size={16} /> You understand your photos will be deleted after {PHOTOBOOTH_RETENTION_DAYS} days.
-          </p>
-        ) : (
-          <>
-            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-white p-3 text-sm ring-1 ring-line">
-              <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-rose" />
-              <span>I understand that my photos will be deleted after {PHOTOBOOTH_RETENTION_DAYS} days.</span>
-            </label>
-            <Button className="mt-3 w-full" disabled={!agree} busy={busy} onClick={() => void send({ acknowledge: true, ...(state.frameId ? {} : { frameId: DEFAULT_FRAME_ID }) })}>
-              Continue
-            </Button>
-          </>
-        )}
-      </Card>
       {error && <p role="alert" className="text-center text-sm text-danger">{error}</p>}
       <SupportLine />
     </div>
@@ -472,20 +516,22 @@ function InviteCard({ link, joined, myName }: { link: string; joined: boolean; m
 function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }: ScreenProps) {
   const { me, partner, phase, attempt, round } = state;
   const partnerName = partner.name ?? "Your person";
-  const [busy, setBusy] = useState(false);
+  const step = `${attempt}:${phase}`;
+  const [busyStep, setBusyStep] = useState<string | null>(null);
+  const busy = busyStep === step;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const shotFor = useRef<number | null>(null);
 
   const act = async (path: string, body: unknown) => {
-    setBusy(true);
+    setBusyStep(step);
     setError(null);
     try {
       await booth.act(path, body);
     } catch (err) {
-      if (!(err instanceof ClientApiError && err.code === "BOOTH_STALE")) setError("Something went wrong. Please tap again.");
+      if (!(err instanceof ClientApiError && err.code === "BOOTH_STALE")) setError("That didn't go through — please tap again.");
     } finally {
-      setBusy(false);
+      setBusyStep((b) => (b === step ? null : b));
     }
   };
 
@@ -526,6 +572,7 @@ function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }
   return (
     <div className="space-y-4">
       <Progress round={round} done={round - 1} />
+      <ConnectionBadge quality={booth.quality} />
 
       {state.notice && phase === "READY" && (
         <p className={`rounded-2xl bg-petal px-4 py-3 text-center text-sm ${s.enter}`}>

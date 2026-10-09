@@ -345,8 +345,33 @@ export async function lobbyUpdate(
   if (input.cameraReady) log.info(ctx.me.camera_issue ? "photobooth_camera_retry_ok" : "photobooth_camera_ready", meta);
   if (input.cameraIssue) log.warn("photobooth_camera_permission_failed", { ...meta, issue: input.cameraIssue });
   if (input.acknowledge) log.info("photobooth_deletion_acknowledged", meta);
-  if (row?.started) log.info("photobooth_round_started", { sessionId: ctx.session.id, round: 1 });
+  const started = row?.started || (row?.status === "PAID" && (await startWhenHostReady(ctx.session.id)));
+  if (started) log.info("photobooth_round_started", { sessionId: ctx.session.id, round: 1 });
   await nudge(ctx.session.realtime_key);
+}
+
+/**
+ * Person A (who paid) starts the photobooth with "Let's Start!" after accepting the 7-day
+ * rule; Person B only needs to be there with their camera on. The conditional update
+ * (status = 'PAID') makes this safe if both browsers trigger it at once.
+ */
+async function startWhenHostReady(sessionId: string): Promise<boolean> {
+  const { data } = await db().from("photobooth_participants").select("role, joined_at, camera_ready_at, deletion_ack_at").eq("session_id", sessionId);
+  const people = (data ?? []) as Pick<PhotoboothParticipantRow, "role" | "joined_at" | "camera_ready_at" | "deletion_ack_at">[];
+  const a = people.find((x) => x.role === "A");
+  const b = people.find((x) => x.role === "B");
+  if (!a?.joined_at || !a.camera_ready_at || !a.deletion_ack_at || !b?.joined_at || !b.camera_ready_at) return false;
+  const { data: moved, error } = await db()
+    .from("photobooth_sessions")
+    .update({ status: "IN_PROGRESS", current_round: 1, attempt: 1, round_phase: "READY", capture_at: null, last_activity_at: new Date().toISOString() })
+    .eq("id", sessionId)
+    .eq("status", "PAID")
+    .select("id, frame_id");
+  if (error) throw new Error(`start photobooth: ${error.message}`);
+  if (!moved?.length) return false;
+  if (!moved[0]!.frame_id) await db().from("photobooth_sessions").update({ frame_id: DEFAULT_FRAME_ID }).eq("id", sessionId);
+  await db().from("photobooth_participants").update({ ready_attempt: null }).eq("session_id", sessionId);
+  return true;
 }
 
 export async function markReady(ctx: BoothContext, attempt: number): Promise<void> {

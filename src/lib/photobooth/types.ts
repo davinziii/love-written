@@ -38,6 +38,8 @@ export interface RtcSignal {
   sdp?: string;
   /** Pairs an answer with its offer; a new value means "start over". */
   epoch: string;
+  /** For "request": "hello" = just arrived (start fresh), "retry" = the last attempt failed. */
+  reason?: "hello" | "retry";
 }
 
 export interface BoothPersonState {

@@ -34,6 +34,10 @@ const sleep = (ms: number, signal?: AbortSignal) =>
  * `retries`: how many more times to try when the request never got an answer (connection
  * dropped — common on mobile data and inside in-app browsers like Messenger). Only use it
  * for requests that are safe to repeat. GET requests retry twice by default.
+ *
+ * `timeoutMs`: a request that hasn't finished by then is abandoned and treated like a dropped
+ * connection (then retried). On weak mobile data a request can otherwise hang for minutes,
+ * leaving buttons stuck "busy" and the page waiting on an answer that never comes.
  */
 export async function api<T>(
   path: string,
@@ -44,14 +48,28 @@ export async function api<T>(
     signal,
     retries = method === "GET" ? 2 : 0,
     headers: extraHeaders,
-  }: { method?: string; body?: unknown; editToken?: string; signal?: AbortSignal; retries?: number; headers?: Record<string, string> } = {},
+    timeoutMs = body instanceof FormData ? 60_000 : 20_000,
+  }: {
+    method?: string;
+    body?: unknown;
+    editToken?: string;
+    signal?: AbortSignal;
+    retries?: number;
+    headers?: Record<string, string>;
+    timeoutMs?: number;
+  } = {},
 ): Promise<T> {
   let res: Response | undefined;
+  let data: (T & Partial<ApiErrorBody>) | null = null;
   for (let attempt = 0; !res; attempt++) {
+    const ctrl = new AbortController();
+    const onAbort = () => ctrl.abort();
+    signal?.addEventListener("abort", onAbort);
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      res = await fetch(path, {
+      const r = await fetch(path, {
         method,
-        signal,
+        signal: ctrl.signal,
         cache: "no-store",
         headers: {
           ...(body !== undefined && !(body instanceof FormData) ? { "content-type": "application/json" } : {}),
@@ -60,13 +78,20 @@ export async function api<T>(
         },
         body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
       });
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") throw err;
+      data = (await r.json().catch((e: unknown) => {
+        if (ctrl.signal.aborted) throw e; // timed out while reading the answer
+        return null;
+      })) as (T & Partial<ApiErrorBody>) | null;
+      res = r;
+    } catch {
+      if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
       if (attempt >= retries) throw new ClientApiError(0, "NETWORK", FRIENDLY_NETWORK_ERROR);
       await sleep(RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)]!, signal);
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
     }
   }
-  const data = (await res.json().catch(() => null)) as (T & Partial<ApiErrorBody>) | null;
   if (!res.ok) {
     const e = data?.error;
     throw new ClientApiError(

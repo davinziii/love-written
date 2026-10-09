@@ -11,6 +11,7 @@ const body = z
     type: z.enum(["offer", "answer", "request", "pause"]),
     sdp: z.string().max(16_000).optional(),
     epoch: z.string().uuid(),
+    reason: z.enum(["hello", "retry"]).optional(),
   })
   .strict();
 
