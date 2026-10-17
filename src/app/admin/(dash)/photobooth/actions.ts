@@ -27,10 +27,11 @@ const manualSchema = z.object({
   customerLabel: z.string().max(120).optional(),
   notes: z.string().max(1000).optional(),
   idempotencyKey: z.string().uuid(),
+  partySize: z.enum(["1", "2"]).default("2"),
   confirmPaid: z.literal("yes"),
 });
 
-/** Manual workflow: payment received outside the site → create a PAID photobooth + both links. */
+/** Manual workflow: payment received outside the site → create a PAID photobooth + its link(s). */
 export async function createManualBoothAction(_prev: BoothIssueResult | null, form: FormData): Promise<BoothIssueResult> {
   const admin = await requireAdmin();
   const parsed = manualSchema.safeParse(Object.fromEntries(form));
@@ -47,6 +48,7 @@ export async function createManualBoothAction(_prev: BoothIssueResult | null, fo
         customerLabel: parsed.data.customerLabel,
         notes: parsed.data.notes,
         idempotencyKey: parsed.data.idempotencyKey,
+        partySize: parsed.data.partySize === "1" ? 1 : 2,
       },
       admin.id,
     );

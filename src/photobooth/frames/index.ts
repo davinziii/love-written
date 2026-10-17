@@ -1,4 +1,5 @@
 import type { PhotoboothFrame } from "./types";
+import { PHOTOBOOTH_ROUNDS } from "@/lib/photobooth/constants";
 import blackWhite from "./black-white/config";
 import white from "./white/config";
 
@@ -21,12 +22,13 @@ export function getFrame(id: string | null | undefined): PhotoboothFrame | undef
 export function validateFrame(f: PhotoboothFrame): string[] {
   const problems: string[] = [];
   if (!/^[a-z0-9-]+$/.test(f.id)) problems.push("id must be lowercase letters, numbers and dashes");
-  if (f.slots.length !== 4) problems.push("exactly 4 slots are required");
+  if (f.slots.length !== PHOTOBOOTH_ROUNDS) problems.push(`exactly ${PHOTOBOOTH_ROUNDS} slots are required (one per photo)`);
   for (const [i, s] of f.slots.entries()) {
     if (s.x < 0 || s.y < 0 || s.x + s.width > f.width || s.y + s.height > f.height) problems.push(`slot ${i + 1} is outside the image`);
     if ((s.width - f.gutter) / 2 < 200 || s.height < 200) problems.push(`slot ${i + 1} is too small`);
   }
   if (f.overlay && !f.overlay.startsWith("/photobooth/frames/")) problems.push("overlay must live under /public/photobooth/frames/");
+  if (f.soloOverlay && !f.soloOverlay.startsWith("/photobooth/frames/")) problems.push("soloOverlay must live under /public/photobooth/frames/");
   if (!f.preview.startsWith("/photobooth/frames/")) problems.push("preview must live under /public/photobooth/frames/");
   return problems;
 }

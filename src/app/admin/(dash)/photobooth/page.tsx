@@ -68,8 +68,10 @@ export default async function PhotoboothAdminPage({ searchParams }: Props) {
                         {issue && <Badge value="CAMERA_ISSUE" />}
                       </div>
                     </td>
-                    <td className="px-4 py-3 tabular-nums">{b.status === "IN_PROGRESS" ? `${b.current_round} / 4` : "—"}</td>
-                    <td className="px-4 py-3 text-xs text-ink-soft">{people.filter((p) => p.joined_at).length} / 2 joined</td>
+                    <td className="px-4 py-3 tabular-nums">{b.status === "IN_PROGRESS" ? `${b.current_round} / ${b.photo_count}` : "—"}</td>
+                    <td className="px-4 py-3 text-xs text-ink-soft">
+                      {b.party_size === 1 ? (people.some((p) => p.joined_at) ? "Solo · joined" : "Solo · not joined yet") : `${people.filter((p) => p.joined_at).length} / 2 joined`}
+                    </td>
                     <td className="px-4 py-3 text-ink-soft">{fmt(b.completed_at)}</td>
                     <td className="px-4 py-3 text-ink-soft">{fmt(b.expires_at)}</td>
                     <td className="px-4 py-3 text-right">

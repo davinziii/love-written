@@ -16,14 +16,18 @@ export function StripPreview({
   frame,
   approved,
   filter,
+  solo = false,
   className = "",
 }: {
   frame: PhotoboothFrame;
   approved: BoothState["approved"];
   filter: StripFilter;
+  /** One photo per slot (a solo photobooth) instead of two side by side. */
+  solo?: boolean;
   className?: string;
 }) {
   const pct = (v: number, of: number) => `${(v / of) * 100}%`;
+  const overlay = solo ? (frame.soloOverlay ?? frame.overlay) : frame.overlay;
   return (
     <div
       className={`relative w-full overflow-hidden rounded-[3px] shadow-[0_18px_36px_-16px_rgba(0,0,0,0.55)] ${className}`}
@@ -34,10 +38,12 @@ export function StripPreview({
       {frame.slots.map((slot, i) => {
         const shot = approved.find((a) => a.round === i + 1);
         const leftW = Math.floor((slot.width - frame.gutter) / 2);
-        const halves = [
-          { x: slot.x, w: leftW, photo: shot?.a },
-          { x: slot.x + leftW + frame.gutter, w: slot.width - frame.gutter - leftW, photo: shot?.b },
-        ];
+        const halves = solo
+          ? [{ x: slot.x, w: slot.width, photo: shot?.a }]
+          : [
+              { x: slot.x, w: leftW, photo: shot?.a },
+              { x: slot.x + leftW + frame.gutter, w: slot.width - frame.gutter - leftW, photo: shot?.b ?? undefined },
+            ];
         return halves.map((h, j) => (
           <div
             key={`${i}-${j}`}
@@ -58,7 +64,7 @@ export function StripPreview({
           </div>
         ));
       })}
-      {frame.overlay && <img src={frame.overlay} alt="" className="pointer-events-none absolute inset-0 h-full w-full" />}
+      {overlay && <img src={overlay} alt="" className="pointer-events-none absolute inset-0 h-full w-full" />}
     </div>
   );
 }

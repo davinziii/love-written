@@ -6,7 +6,7 @@ import { DEFAULT_FRAME_ID, getFrame } from "@/photobooth/frames";
 import s from "./photobooth.module.css";
 
 /**
- * "Two people → four photos → one strip", drawn with sample illustrations and the real
+ * "Two people → three photos → one strip", drawn with sample illustrations and the real
  * frame preview. No camera, no client JS — pure CSS motion (off for reduced motion).
  */
 export function PhotoboothVisual({ className = "" }: { className?: string }) {
@@ -25,7 +25,7 @@ export function PhotoboothVisual({ className = "" }: { className?: string }) {
         src={frame.preview}
         alt=""
         width={400}
-        height={1200}
+        height={Math.round((400 * frame.height) / frame.width)}
         className={`h-[22rem] w-auto rounded-sm shadow-[0_30px_50px_-20px_rgba(0,0,0,0.55)] sm:h-[26rem] ${s.stripIn}`}
         loading="lazy"
       />

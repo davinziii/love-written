@@ -85,7 +85,8 @@ export async function participantLinks(sessionId: string): Promise<{ a: string |
 export interface BoothContext {
   session: PhotoboothSessionRow;
   me: PhotoboothParticipantRow;
-  partner: PhotoboothParticipantRow;
+  /** The other person — null in a solo photobooth. */
+  partner: PhotoboothParticipantRow | null;
 }
 
 async function loadSession(sessionId: string): Promise<PhotoboothSessionRow | null> {
@@ -114,9 +115,9 @@ export async function authorizeBooth(sessionId: string, req: Request, { claimDev
   const participants = (rows ?? []) as PhotoboothParticipantRow[];
   const hash = sha256Hex(token);
   const me = participants.find((p) => p.token_hash === hash);
-  const partner = participants.find((p) => p.role !== me?.role);
+  const partner = participants.find((p) => p.role !== me?.role) ?? null;
   const session = me ? await loadSession(sessionId) : null;
-  if (!me || !partner || !session || session.status === "DELETED") throw await fail();
+  if (!me || !session || session.status === "DELETED" || (!partner && session.party_size !== 1)) throw await fail();
 
   // One device per link at a time while the photobooth is running. A new device can take over
   // once the old one goes quiet, so switching phones works — but a forwarded link can't join a
@@ -182,6 +183,21 @@ function person(p: PhotoboothParticipantRow, s: PhotoboothSessionRow, round: Pho
   };
 }
 
+/** Stands in for the partner in a solo photobooth, so the state shape stays the same. */
+const NOBODY: BoothPersonState = {
+  name: null,
+  pick: { frame: null, filter: null, confirmed: false },
+  joined: false,
+  connected: false,
+  awayMs: null,
+  cameraReady: false,
+  cameraIssue: null,
+  acknowledged: false,
+  ready: false,
+  uploaded: false,
+  decision: null,
+};
+
 /** The live view runs from the lobby through choosing the look. */
 export const liveViewOn = (status: string) => status === "PAID" || status === "IN_PROGRESS" || status === "DESIGNING";
 const MAX_CHAT_MESSAGES = 60;
@@ -190,6 +206,9 @@ const isExpired = (s: PhotoboothSessionRow) => s.status === "COMPLETED" && s.exp
 
 export async function buildState(ctx: BoothContext): Promise<BoothState> {
   const { session: s, me, partner } = ctx;
+  const solo = s.party_size === 1;
+  /** A round's photos are all in: Person A's, plus Person B's unless solo. */
+  const complete = (r: { a_path: string | null; b_path: string | null }) => Boolean(r.a_path && (solo || r.b_path));
   const { data: roundRows } = await db()
     .from("photobooth_rounds")
     .select("*")
@@ -211,27 +230,29 @@ export async function buildState(ctx: BoothContext): Promise<BoothState> {
   const { data: approvedRows } = live
     ? await db().from("photobooth_rounds").select("round, a_path, b_path").eq("session_id", s.id).eq("status", "APPROVED").order("round")
     : { data: [] };
-  const approvedList = ((approvedRows ?? []) as Pick<PhotoboothRoundRow, "round" | "a_path" | "b_path">[]).filter((r) => r.a_path && r.b_path);
-  const reviewing = s.status === "IN_PROGRESS" && s.round_phase === "REVIEW" && current?.a_path && current.b_path ? current : null;
-  const paths = [...approvedList.flatMap((r) => [r.a_path!, r.b_path!]), ...(reviewing ? [reviewing.a_path!, reviewing.b_path!] : [])];
+  const approvedList = ((approvedRows ?? []) as Pick<PhotoboothRoundRow, "round" | "a_path" | "b_path">[]).filter(complete);
+  const reviewing = s.status === "IN_PROGRESS" && s.round_phase === "REVIEW" && current && complete(current) ? current : null;
+  const paths = [...approvedList, ...(reviewing ? [reviewing] : [])].flatMap((r) => [r.a_path, r.b_path]).filter((p): p is string => Boolean(p));
   const urls = paths.length ? await signedUrls(paths) : new Map<string, string>();
-  const photo = (path: string): SignedPhoto => ({ key: path.slice(path.lastIndexOf("/") + 1), url: urls.get(path) ?? "" });
+  const photo = (path: string | null): SignedPhoto | null => (path ? { key: path.slice(path.lastIndexOf("/") + 1), url: urls.get(path) ?? "" } : null);
 
   const review: BoothState["review"] = reviewing
     ? {
-        mine: photo(me.role === "A" ? reviewing.a_path! : reviewing.b_path!),
-        theirs: photo(me.role === "A" ? reviewing.b_path! : reviewing.a_path!),
+        mine: photo(me.role === "A" ? reviewing.a_path : reviewing.b_path)!,
+        theirs: photo(me.role === "A" ? reviewing.b_path : reviewing.a_path),
       }
     : null;
-  const approved = approvedList.map((r) => ({ round: r.round, a: photo(r.a_path!), b: photo(r.b_path!) }));
+  const approved = approvedList.map((r) => ({ round: r.round, a: photo(r.a_path)!, b: photo(r.b_path) }));
 
-  // Chat: the latest messages (both people), oldest first.
-  const { data: messageRows } = await db()
-    .from("photobooth_messages")
-    .select("id, role, body, created_at")
-    .eq("session_id", s.id)
-    .order("id", { ascending: false })
-    .limit(MAX_CHAT_MESSAGES);
+  // Chat: the latest messages (both people), oldest first. A solo photobooth has no chat.
+  const { data: messageRows } = solo
+    ? { data: [] }
+    : await db()
+        .from("photobooth_messages")
+        .select("id, role, body, created_at")
+        .eq("session_id", s.id)
+        .order("id", { ascending: false })
+        .limit(MAX_CHAT_MESSAGES);
   const messages = ((messageRows ?? []) as { id: number; role: string; body: string; created_at: string }[])
     .reverse()
     .map((m) => ({ id: m.id, mine: m.role === me.role, body: m.body, at: m.created_at }));
@@ -239,24 +260,26 @@ export async function buildState(ctx: BoothContext): Promise<BoothState> {
   const expired = isExpired(s);
   let result: BoothState["result"] = null;
   if (s.status === "COMPLETED" && !expired && s.output_path && s.expires_at && s.completed_at) {
-    const rounds4 = Array.from({ length: PHOTOBOOTH_ROUNDS }, (_, i) => i + 1);
+    const roundNumbers = Array.from({ length: s.photo_count ?? PHOTOBOOTH_ROUNDS }, (_, i) => i + 1);
     const [stripUrl, stripDownload, ...photoUrls] = await Promise.all([
       signedUrl(s.output_path),
       signedUrl(s.output_path, { download: "love-written-photobooth.jpg" }),
-      ...rounds4.flatMap((n) => [signedUrl(pairPath(s.id, n)), signedUrl(pairPath(s.id, n), { download: `love-written-photo-${n}.jpg` })]),
+      ...roundNumbers.flatMap((n) => [signedUrl(pairPath(s.id, n)), signedUrl(pairPath(s.id, n), { download: `love-written-photo-${n}.jpg` })]),
     ]);
     result = {
       strip: { url: stripUrl!, download: stripDownload! },
-      photos: rounds4.map((n, i) => ({ round: n, url: photoUrls[i * 2]!, download: photoUrls[i * 2 + 1]! })),
+      photos: roundNumbers.map((n, i) => ({ round: n, url: photoUrls[i * 2]!, download: photoUrls[i * 2 + 1]! })),
       expiresAt: s.expires_at,
       completedAt: s.completed_at,
     };
   }
 
-  const inviteToken = me.role === "A" ? openSecret(partner.token_enc) : null;
+  const inviteToken = me.role === "A" && partner ? openSecret(partner.token_enc) : null;
   return {
     serverNow: Date.now(),
     sessionId: s.id,
+    solo,
+    photoCount: s.photo_count ?? PHOTOBOOTH_ROUNDS,
     status: expired ? "EXPIRED" : s.status,
     paymentStatus: s.payment_status,
     priceCentavos: s.price_centavos,
@@ -268,8 +291,8 @@ export async function buildState(ctx: BoothContext): Promise<BoothState> {
     notice,
     realtimeKey: s.realtime_key,
     me: { ...person(me, s, current), role: me.role },
-    partner: person(partner, s, current),
-    partnerSignal: liveViewOn(s.status) ? (partner.rtc_signal ?? null) : null,
+    partner: partner ? person(partner, s, current) : NOBODY,
+    partnerSignal: partner && liveViewOn(s.status) ? (partner.rtc_signal ?? null) : null,
     inviteLink: inviteToken ? participantLink(s.id, inviteToken) : null,
     review,
     approved,
@@ -345,7 +368,7 @@ export async function lobbyUpdate(
   if (input.cameraReady) log.info(ctx.me.camera_issue ? "photobooth_camera_retry_ok" : "photobooth_camera_ready", meta);
   if (input.cameraIssue) log.warn("photobooth_camera_permission_failed", { ...meta, issue: input.cameraIssue });
   if (input.acknowledge) log.info("photobooth_deletion_acknowledged", meta);
-  const started = row?.started || (row?.status === "PAID" && (await startWhenHostReady(ctx.session.id)));
+  const started = row?.started || (row?.status === "PAID" && (await startWhenHostReady(ctx.session.id, ctx.session.party_size === 1)));
   if (started) log.info("photobooth_round_started", { sessionId: ctx.session.id, round: 1 });
   await nudge(ctx.session.realtime_key);
 }
@@ -355,12 +378,13 @@ export async function lobbyUpdate(
  * rule; Person B only needs to be there with their camera on. The conditional update
  * (status = 'PAID') makes this safe if both browsers trigger it at once.
  */
-async function startWhenHostReady(sessionId: string): Promise<boolean> {
+async function startWhenHostReady(sessionId: string, solo: boolean): Promise<boolean> {
   const { data } = await db().from("photobooth_participants").select("role, joined_at, camera_ready_at, deletion_ack_at").eq("session_id", sessionId);
   const people = (data ?? []) as Pick<PhotoboothParticipantRow, "role" | "joined_at" | "camera_ready_at" | "deletion_ack_at">[];
   const a = people.find((x) => x.role === "A");
   const b = people.find((x) => x.role === "B");
-  if (!a?.joined_at || !a.camera_ready_at || !a.deletion_ack_at || !b?.joined_at || !b.camera_ready_at) return false;
+  if (!a?.joined_at || !a.camera_ready_at || !a.deletion_ack_at) return false;
+  if (!solo && (!b?.joined_at || !b.camera_ready_at)) return false;
   const { data: moved, error } = await db()
     .from("photobooth_sessions")
     .update({ status: "IN_PROGRESS", current_round: 1, attempt: 1, round_phase: "READY", capture_at: null, last_activity_at: new Date().toISOString() })
@@ -454,6 +478,7 @@ export async function savePick(ctx: BoothContext, input: { frameId?: string; fil
 /** A chat message to the other person. Retries with the same clientId are stored once. */
 export async function sendMessage(ctx: BoothContext, body: string, clientId: string): Promise<void> {
   const s = ctx.session;
+  if (s.party_size === 1) throw Errors.conflict("BOOTH_STALE", "This photobooth doesn't have a chat.");
   if (s.status === "AWAITING_PAYMENT" || s.status === "EXPIRED" || s.status === "CLEANUP_FAILED" || isExpired(s)) {
     throw Errors.conflict("BOOTH_STALE", "Chat isn't available right now.");
   }
@@ -469,7 +494,7 @@ export async function sendMessage(ctx: BoothContext, body: string, clientId: str
 
 // ─── Final strip ────────────────────────────────────────────────────────────
 
-/** Build the strip + the 4 photos. Idempotent: only one claim at a time, outputs overwrite. */
+/** Build the strip + the single photos. Idempotent: only one claim at a time, outputs overwrite. */
 export async function finalizeBooth(sessionId: string): Promise<void> {
   const { data: claimed, error: claimError } = await db().rpc("pb_claim_generation", {
     p_session: sessionId,
@@ -493,11 +518,13 @@ export async function finalizeBooth(sessionId: string): Promise<void> {
       .order("round", { ascending: true });
     if (error) throw new Error(error.message);
     const approved = (data ?? []) as PhotoboothRoundRow[];
-    if (approved.length !== PHOTOBOOTH_ROUNDS || approved.some((r) => !r.a_path || !r.b_path)) {
-      throw new Error(`expected ${PHOTOBOOTH_ROUNDS} approved rounds, found ${approved.length}`);
+    const solo = session.party_size === 1;
+    const expected = session.photo_count ?? PHOTOBOOTH_ROUNDS;
+    if (approved.length !== expected || approved.some((r) => !r.a_path || (!solo && !r.b_path))) {
+      throw new Error(`expected ${expected} approved rounds, found ${approved.length}`);
     }
     const photos: RoundPhotos[] = await Promise.all(
-      approved.map(async (r) => ({ round: r.round, a: await getObject(r.a_path!), b: await getObject(r.b_path!) })),
+      approved.map(async (r) => ({ round: r.round, a: await getObject(r.a_path!), b: solo ? null : await getObject(r.b_path!) })),
     );
     const frame = getFrame(session.frame_id) ?? getFrame(DEFAULT_FRAME_ID)!;
     const grayscale = session.final_filter ? session.final_filter === "bw" : frame.grayscale;

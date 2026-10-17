@@ -11,6 +11,8 @@ import type { PhotoboothSessionRow } from "@/lib/db-types";
 
 const body = z.object({
   createKey: idempotencyKeySchema,
+  // 1 = solo photobooth, 2 = with a partner (the default).
+  partySize: z.union([z.literal(1), z.literal(2)]).default(2),
   turnstileToken: z.string().max(4096).optional(),
 });
 
@@ -24,7 +26,7 @@ export const POST = route("photobooth_create", async (req: Request) => {
   await enforceRateLimit("boothCreate", ipKey(req.headers));
   await verifyTurnstile(input.turnstileToken, clientIp(req.headers));
 
-  const { sessionId, token } = await createPendingBooth(input.createKey);
+  const { sessionId, token } = await createPendingBooth(input.createKey, input.partySize);
   const { data } = await db().from("photobooth_sessions").select("*").eq("id", sessionId).single();
   const checkout = await startBoothCheckout(data as PhotoboothSessionRow, input.createKey);
   return NextResponse.json(

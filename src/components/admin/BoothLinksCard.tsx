@@ -4,17 +4,32 @@ import { Icon } from "@/components/ui/icons";
 import { CopyRow } from "./IssuedAccessCard";
 
 /**
- * Both private photobooth links + a ready-to-paste message for the buyer (Person A).
+ * The private photobooth link(s) + a ready-to-paste message for the buyer (Person A).
  * Person A's own screen also shows Person B's invite link, so sending A's link is enough.
+ * A solo photobooth has only Person A's link, and the message doesn't mention an invite.
  */
-export function BoothLinksCard({ linkA, linkB, orderNumber, fresh = false }: { linkA: string; linkB: string | null; orderNumber?: string; fresh?: boolean }) {
+export function BoothLinksCard({
+  linkA,
+  linkB,
+  orderNumber,
+  fresh = false,
+  solo = !linkB,
+}: {
+  linkA: string;
+  linkB: string | null;
+  orderNumber?: string;
+  fresh?: boolean;
+  solo?: boolean;
+}) {
   const message = [
     "Hi! 📸 Your Love, Written Photobooth is ready.",
     "",
     "Your private photobooth link:",
     linkA,
     "",
-    "Open it, check your camera, then send your person the invite link you'll see there (they join free).",
+    solo
+      ? "Open it, check your camera, and take your photos whenever you're ready."
+      : "Open it, check your camera, then send your person the invite link you'll see there (they join free).",
     "",
     "📱 For best results, tap ⋯ → Open in browser (Chrome or Safari).",
     "🗓️ Your photos are kept for 7 days after you finish — download them before then.",

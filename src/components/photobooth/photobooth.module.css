@@ -154,6 +154,19 @@
   background: #0b0b0b;
   box-shadow: 0 30px 60px -30px rgb(43 29 34 / 0.55);
 }
+/* Solo: one landscape tile, the same 3:2 shape as the saved photo and its strip slot. */
+.split[data-solo] {
+  grid-template-columns: 1fr;
+  max-width: 560px;
+  margin-inline: auto;
+}
+.split[data-solo] .tile {
+  aspect-ratio: 3 / 2;
+}
+/* Live cameras (and review photos) in black & white. */
+.mono {
+  filter: grayscale(1);
+}
 .tile {
   position: relative;
   overflow: hidden;

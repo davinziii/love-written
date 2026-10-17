@@ -9,7 +9,7 @@ const STEPS = [
   { icon: Icon.wallet, text: "Confirm the payment in your GCash / Maya / bank app." },
   { icon: Icon.image, text: "Create the photobooth here — it is marked as paid." },
   { icon: Icon.send, text: "DM the buyer their private link (Person A)." },
-  { icon: Icon.link, text: "They check their camera and send their person the invite link they see." },
+  { icon: Icon.link, text: "They check their camera — and for two people, send their person the invite link they see." },
 ];
 
 export default async function NewPhotoboothPage() {
@@ -38,7 +38,7 @@ export default async function NewPhotoboothPage() {
             ))}
           </ol>
           <p className="mt-5 text-xs leading-relaxed text-ink-soft">
-            The 7-day photo retention starts only when they finish their four photos. Camera problems never use up the session.
+            The 7-day photo retention starts only when they finish their photos. Camera problems never use up the session.
           </p>
         </Card>
       </div>

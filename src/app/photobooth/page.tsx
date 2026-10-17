@@ -13,21 +13,26 @@ import { PHOTOBOOTH_RETENTION_DAYS } from "@/lib/photobooth/constants";
 
 export const metadata: Metadata = {
   title: "Photobooth",
-  description: "A private digital photobooth for two. Take four photos together, even when you're apart.",
+  description: "A private digital photobooth for two. Take three photos together, even when you're apart.",
 };
 
 const STEPS = [
   { icon: Icon.wallet, title: "Pay", body: "One session for two people." },
   { icon: Icon.send, title: "Invite your person", body: "They get their own private link — and join free." },
   { icon: Icon.monitor, title: "Open your cameras", body: "On your phones or laptops, wherever you both are." },
-  { icon: Icon.clock, title: "Take 4 photos together", body: "A shared 3 · 2 · 1 countdown, so you click at the same moment." },
+  { icon: Icon.clock, title: "Take 3 photos together", body: "A shared 3 · 2 · 1 countdown, so you click at the same moment." },
   { icon: Icon.check, title: "Approve your favorites", body: "See each other live, chat, and keep each photo together — or retake it." },
-  { icon: Icon.image, title: "Pick your look & download", body: "Black & white or color, black or white frame — then your strip and all four photos." },
+  { icon: Icon.image, title: "Pick your look & download", body: "Black & white or color, black or white frame — then your strip and every photo." },
 ];
 
 export default function PhotoboothPage() {
   const price = formatPeso(photoboothPriceCentavos());
-  const cta = isManualPayments ? <MessageToOrderCTA templateName="Photobooth" /> : <CreateBoothButton label={`Create a Photobooth — ${price}`} />;
+  const soloPrice = formatPeso(photoboothPriceCentavos(1));
+  const cta = isManualPayments ? (
+    <MessageToOrderCTA templateName="Photobooth" />
+  ) : (
+    <CreateBoothButton label={`Create a Photobooth — ${price}`} soloLabel={`Create a solo Photobooth — ${soloPrice}`} />
+  );
 
   return (
     <>
@@ -40,7 +45,7 @@ export default function PhotoboothPage() {
               <Eyebrow icon={(p) => <HeartIcon {...p} />}>Love, Written Photobooth</Eyebrow>
               <h1 className="mt-5 font-display text-5xl leading-[1.05] tracking-tight sm:text-6xl">Your own little photobooth, wherever you are.</h1>
               <p className="mt-5 max-w-xl text-lg leading-relaxed text-ink-soft">
-                Invite someone you love. Open your cameras. Take four photos together. Keep the moment.
+                Invite someone you love. Open your cameras. Take three photos together. Keep the moment.
               </p>
               <p className="mt-6 flex items-baseline gap-2">
                 <span className="font-display text-5xl">{price}</span>
@@ -93,7 +98,7 @@ export default function PhotoboothPage() {
               </p>
               <ul className="mt-6 grid gap-3 text-sm text-cream/75 sm:grid-cols-2">
                 {[
-                  "The 7 days start only when your four photos are done — not when you pay.",
+                  "The 7 days start only when your photos are done — not when you pay.",
                   "Your camera stays on your device. Only the photos you keep together are saved.",
                   "Each of you gets your own private link. Nobody else can join.",
                   "Camera trouble? Your paid session is never lost — come back anytime.",

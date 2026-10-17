@@ -1,13 +1,13 @@
 # Photobooth — architecture
 
 A private, two-person online photobooth. Person A pays (₱50), invites Person B (free), both
-open their cameras, take **4** synchronized photos, **both** approve each one, and get a
+open their cameras, take **3** synchronized photos, **both** approve each one, and get a
 real photobooth strip. Photos are deleted **7 days after completion**.
 
 ```
 Person A pays ─▶ PAID ─▶ camera check ─▶ invite ─▶ design ─▶ 7-day notice ─▶ waiting
                                   (Person B: camera check ─▶ design ─▶ notice)
-both set ─▶ IN_PROGRESS: [READY ─▶ COUNTDOWN ─▶ REVIEW] × 4 ─▶ GENERATING ─▶ COMPLETED
+both set ─▶ IN_PROGRESS: [READY ─▶ COUNTDOWN ─▶ REVIEW] × 3 ─▶ GENERATING ─▶ COMPLETED
 COMPLETED ─(7 days)─▶ EXPIRED ─▶ photos deleted + verified ─▶ DELETED
 ```
 
@@ -16,7 +16,7 @@ COMPLETED ─(7 days)─▶ EXPIRED ─▶ photos deleted + verified ─▶ DELE
 | Piece | File(s) |
 |---|---|
 | Database (tables, state functions) | `supabase/migrations/0005_photobooth.sql` |
-| Rules (4 photos, 7 days, timings) | `src/lib/photobooth/constants.ts` |
+| Rules (3 photos, 7 days, timings) | `src/lib/photobooth/constants.ts` |
 | Server: links, presence, state, actions, strip | `src/lib/photobooth/session.ts` |
 | Server: payments (PayMongo + manual) | `src/lib/photobooth/payments.ts`, `src/lib/payments/webhook.ts` |
 | Server: images (validate, compose) | `src/lib/photobooth/images.ts` |
@@ -28,6 +28,32 @@ COMPLETED ─(7 days)─▶ EXPIRED ─▶ photos deleted + verified ─▶ DELE
 | Frames | `src/photobooth/frames/**` + `public/photobooth/frames/**` — see [PHOTOBOOTH_FRAMES.md](PHOTOBOOTH_FRAMES.md) |
 | Pages | `/photobooth` (product), `/photobooth/s/[id]#k=…` (session), `/admin/photobooth` |
 
+## Three photos per strip
+
+Each session stores its `photo_count` (migration 0009): **3** for new sessions. Sessions that
+had already started or finished before 0009 keep 4, so their results still list every photo.
+Every frame has exactly `PHOTOBOOTH_ROUNDS` (3) slots.
+
+## Solo photobooth (one person)
+
+A session has a `party_size` (migration 0008): **2** = Person A + an invited Person B (everything
+above), **1** = Person A alone. Solo sessions have no Person B row, so there is no invite link, no
+chat and no live partner view. Every "both people" rule in the SQL state functions becomes
+"everyone in this session", so solo starts, counts down, reviews and finishes with just Person A.
+
+- Created from Admin → Photobooth → Create (choose "Just one person"), or self-serve with the
+  "Just me" option. Price: `PHOTOBOOTH_SOLO_PRICE_CENTAVOS` if set, otherwise the normal price.
+- The camera captures **landscape 3:2** stills (1200 × 800) and the live tile shows the same
+  shape: one photo fills a whole strip slot. Strips use the frame's `soloOverlay` (one window
+  per slot) — see [PHOTOBOOTH_FRAMES.md](PHOTOBOOTH_FRAMES.md).
+
+## Live camera colors
+
+Each person can switch their live view between **Color** and **Black & white** (a CSS filter on
+the video — nothing extra is processed or sent). It's remembered per device for that
+photobooth, also tints the review photos, and is pre-selected as the strip's filter after the
+photos. Photos are always saved in color; the strip filter is applied when the strip is made.
+
 ## Session lifecycle
 
 `photobooth_sessions.status`:
@@ -37,8 +63,8 @@ COMPLETED ─(7 days)─▶ EXPIRED ─▶ photos deleted + verified ─▶ DELE
 | `AWAITING_PAYMENT` | self-serve, waiting for PayMongo | removed after 48 h if never paid |
 | `PAID` | paid; camera check / invite / design / notice | **yes** — camera problems never leave this state |
 | `IN_PROGRESS` | taking photos (`round_phase` = READY / COUNTDOWN / REVIEW) | yes — leave and come back anytime |
-| `DESIGNING` | all 4 kept; both choose filter + frame | yes |
-| `GENERATING` | all 4 approved; building the strip | retried automatically |
+| `DESIGNING` | all photos kept; both choose filter + frame | yes |
+| `GENERATING` | all photos approved; building the strip | retried automatically |
 | `FINALIZATION_FAILED` | strip failed 3× | "Try again" button + admin retry; no new payment |
 | `COMPLETED` | strip ready — **7-day clock starts here** (`completed_at` → `expires_at`) | — |
 | `EXPIRED` | past 7 days; access already blocked; waiting for deletion | — |
@@ -105,7 +131,7 @@ read restarts that photo (`pb_abort_stale`) and deletes the half-taken shot.
   with every photo both people kept, so it's exactly what the download will look like. Photo
   links carry a stable key and the browser reuses the first link (`stable-url.ts`), so images
   don't reload on every state read.
-- **Choosing the look (DESIGNING):** after photo 4 both pick a **filter** (black & white /
+- **Choosing the look (DESIGNING):** after the last photo both pick a **filter** (black & white /
   color) and a **frame** (Black / White). Each sees the other's pick ("Samantha picks this").
   `pb_pick` makes the strip only when both have confirmed the SAME look; changing your pick
   un-confirms it. The choice is stored as `frame_id` + `final_filter`.
@@ -156,8 +182,8 @@ the camera. Only `/photobooth/s/*` may use the camera (`Permissions-Policy` in `
   back to the camera (new `attempt`, same photo number) and the old shots are deleted.
 - Output: after photo 4, one worker claims generation (`pb_claim_generation`), downloads the
   8 photos, and `composeStrip(frame, photos)` places them into the frame's slots and lays the
-  overlay on top → `photobooth-strip.jpg`, plus four side-by-side colour pairs
-  (`photo-1..4.jpg`). Then `pb_complete` sets `completed_at` and `expires_at = +7 days`.
+  overlay on top → `photobooth-strip.jpg`, plus one side-by-side colour pair per photo
+  (`photo-1..3.jpg`). Then `pb_complete` sets `completed_at` and `expires_at = +7 days`.
 - Downloads are short-lived signed URLs (`Content-Disposition: attachment`). Downloading
   never extends retention.
 
@@ -208,7 +234,7 @@ Never logged: tokens, photos, camera data.
 
 ## Setup checklist
 
-1. Run `supabase/migrations/0005_photobooth.sql`, `0006_photobooth_live_video.sql` and `0007_photobooth_names_chat_design.sql` in the Supabase SQL editor.
+1. Run `supabase/migrations/0005_photobooth.sql`, `0006_photobooth_live_video.sql`, `0007_photobooth_names_chat_design.sql`, `0008_photobooth_solo.sql` and `0009_photobooth_three_photos.sql` in the Supabase SQL editor.
 1b. For the live view on mobile data: create a Cloudflare TURN key and set `CLOUDFLARE_TURN_KEY_ID` + `CLOUDFLARE_TURN_API_TOKEN`.
 2. (Optional) `PHOTOBOOTH_PRICE_CENTAVOS` in Vercel.
 3. Realtime is used automatically (Broadcast is on by default in Supabase). If you ever

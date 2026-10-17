@@ -1,7 +1,7 @@
 /** Photobooth rules (shared by server and browser). Documented in docs/PHOTOBOOTH.md. */
 
-/** Exactly four photos — not configurable in V1. */
-export const PHOTOBOOTH_ROUNDS = 4;
+/** Photos per strip for new sessions (each session also stores its own `photo_count`). Every frame has this many slots. */
+export const PHOTOBOOTH_ROUNDS = 3;
 
 /** Photos stay downloadable this many days AFTER the session is completed. */
 export const PHOTOBOOTH_RETENTION_DAYS = 7;
@@ -30,8 +30,11 @@ export const PHOTOBOOTH_IDLE_DAYS = 60;
 /** Unpaid self-serve sessions are removed after this long. */
 export const PHOTOBOOTH_UNPAID_HOURS = 48;
 
-/** Captured photo size (3:4 portrait). */
+/** Captured photo size (3:4 portrait) — two people side by side fill one strip slot. */
 export const CAPTURE_WIDTH = 900;
 export const CAPTURE_HEIGHT = 1200;
+/** Solo photobooth: one landscape photo (3:2) fills a whole strip slot. */
+export const SOLO_CAPTURE_WIDTH = 1200;
+export const SOLO_CAPTURE_HEIGHT = 800;
 
 export const PHOTOBOOTH_TIMEZONE = "Asia/Manila";

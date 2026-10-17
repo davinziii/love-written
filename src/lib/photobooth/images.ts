@@ -47,7 +47,8 @@ async function readPublicAsset(publicPath: string): Promise<Buffer> {
 export interface RoundPhotos {
   round: number;
   a: Buffer;
-  b: Buffer;
+  /** Person B's photo — null in a solo photobooth. */
+  b: Buffer | null;
 }
 
 async function fit(photo: Buffer, width: number, height: number, grayscale: boolean): Promise<Buffer> {
@@ -57,8 +58,9 @@ async function fit(photo: Buffer, width: number, height: number, grayscale: bool
 }
 
 /**
- * The final strip: photos go into the frame's slots (A left, B right), then the overlay on
- * top. Everything comes from the frame config — no frame is special-cased here.
+ * The final strip: photos go into the frame's slots (A left, B right; a solo photo fills the
+ * whole slot), then the overlay on top. Everything comes from the frame config — no frame is
+ * special-cased here.
  */
 export async function composeStrip(
   frame: PhotoboothFrame,
@@ -69,6 +71,10 @@ export async function composeStrip(
   const layers: OverlayOptions[] = [];
   for (const [i, slot] of frame.slots.entries()) {
     const r = rounds[i]!;
+    if (!r.b) {
+      layers.push({ input: await fit(r.a, slot.width, slot.height, grayscale), left: slot.x, top: slot.y });
+      continue;
+    }
     const leftW = Math.floor((slot.width - frame.gutter) / 2);
     const rightW = slot.width - frame.gutter - leftW;
     layers.push(
@@ -76,8 +82,11 @@ export async function composeStrip(
       { input: await fit(r.b, rightW, slot.height, grayscale), left: slot.x + leftW + frame.gutter, top: slot.y },
     );
   }
-  if (frame.overlay) {
-    const overlay = await sharp(await readPublicAsset(frame.overlay)).resize(frame.width, frame.height, { fit: "fill" }).png().toBuffer();
+  // Solo strips use the frame's one-window-per-slot overlay when it has one.
+  const solo = rounds.every((r) => !r.b);
+  const overlayPath = solo ? (frame.soloOverlay ?? frame.overlay) : frame.overlay;
+  if (overlayPath) {
+    const overlay = await sharp(await readPublicAsset(overlayPath)).resize(frame.width, frame.height, { fit: "fill" }).png().toBuffer();
     layers.push({ input: overlay, left: 0, top: 0 });
   }
   return sharp({ create: { width: frame.width, height: frame.height, channels: 3, background: frame.background } })
@@ -86,11 +95,20 @@ export async function composeStrip(
     .toBuffer();
 }
 
-/** One downloadable "Photo n": both people side by side, in color. */
+/** One downloadable "Photo n": both people side by side (or just the one photo when solo), in color. */
 export async function composePair(r: RoundPhotos): Promise<Buffer> {
   const w = 900;
   const h = 1200;
   const gap = 24;
+  if (!r.b) {
+    // Solo photos are landscape (3:2), like the strip slot they fill.
+    const sw = 1200;
+    const sh = 800;
+    return sharp({ create: { width: sw + gap * 2, height: sh + gap * 2, channels: 3, background: "#ffffff" } })
+      .composite([{ input: await fit(r.a, sw, sh, false), left: gap, top: gap }])
+      .jpeg({ quality: 88, mozjpeg: true })
+      .toBuffer();
+  }
   const [a, b] = await Promise.all([fit(r.a, w, h, false), fit(r.b, w, h, false)]);
   return sharp({ create: { width: w * 2 + gap * 3, height: h + gap * 2, channels: 3, background: "#ffffff" } })
     .composite([

@@ -19,7 +19,7 @@ import { useBooth, type ConnectionQuality } from "./useBooth";
 import { useCamera, type Camera } from "./useCamera";
 import { useLiveVideo, type LiveStatus } from "./useLiveVideo";
 import { useIdle } from "./useIdle";
-import { CameraTrouble, CameraView, Card, CopyButton, Countdown, PartnerStatus, Progress, SplitView, SupportLine } from "./BoothParts";
+import { CameraTrouble, CameraView, Card, CopyButton, Countdown, FilterToggle, PartnerStatus, Progress, SplitView, SupportLine } from "./BoothParts";
 import { StripPreview } from "./StripPreview";
 import { BoothChat } from "./BoothChat";
 import s from "./photobooth.module.css";
@@ -30,15 +30,17 @@ import s from "./photobooth.module.css";
  *   → IN_PROGRESS (ready → countdown → review, ×4) → DESIGNING (filter + frame)
  *   → GENERATING → COMPLETED
  * From the lobby on: live strip preview on the left, the two of you in the middle,
- * chat on the right (stacked on phones).
+ * chat on the right (stacked on phones). A solo photobooth has no partner, invite or chat.
  */
 export function BoothApp({ sessionId, justPaid, cancelled }: { sessionId: string; justPaid: boolean; cancelled: boolean }) {
   const idle = useIdle(true);
   const booth = useBooth(sessionId, { slow: idle.state === "paused" });
   const camera = useCamera();
   const [away, setAway] = useState(false);
+  const [cameraFilter, setCameraFilter] = useCameraFilter(sessionId);
   const { state, token } = booth;
   const status = state?.status;
+  const solo = Boolean(state?.solo);
 
   // Camera on while it's needed, off otherwise (never left running in the background).
   const needsCamera = !away && (status === "PAID" || status === "IN_PROGRESS" || status === "DESIGNING");
@@ -55,7 +57,7 @@ export function BoothApp({ sessionId, justPaid, cancelled }: { sessionId: string
     sessionId,
     token: token ?? "",
     role: state?.me.role ?? "A",
-    enabled: Boolean(token) && !away && liveStage,
+    enabled: Boolean(token) && !away && liveStage && !solo,
     paused: idle.state === "paused",
     stream: camera.liveStream,
     partnerSignal: state?.partnerSignal ?? null,
@@ -90,7 +92,8 @@ export function BoothApp({ sessionId, justPaid, cancelled }: { sessionId: string
     );
   }
 
-  const props: ScreenProps = { booth, state, camera, live, myLink, sessionId, token, justPaid, cancelled, onAway: goAway };
+  const look = { filter: cameraFilter, setFilter: setCameraFilter };
+  const props: ScreenProps = { booth, state, camera, live, myLink, sessionId, token, justPaid, cancelled, onAway: goAway, look };
   const partnerName = state.partner.name ?? "Your person";
   const wide = isWide(state);
   const canLeave = status === "PAID" || status === "IN_PROGRESS" || status === "DESIGNING";
@@ -101,17 +104,19 @@ export function BoothApp({ sessionId, justPaid, cancelled }: { sessionId: string
       {liveStage && idle.state !== "active" && <AwayPrompt state={idle.state} onHere={idle.resume} />}
       {wide ? (
         <Stage
-          left={status === "COMPLETED" ? null : <LivePreview state={state} />}
+          left={status === "COMPLETED" ? null : <LivePreview state={state} cameraFilter={cameraFilter} />}
           main={<Screen {...props} />}
           right={
-            <BoothChat
-              sessionId={sessionId}
-              token={token}
-              messages={state.messages}
-              partnerName={partnerName}
-              onSent={() => void booth.refresh()}
-              className="h-full"
-            />
+            solo ? null : (
+              <BoothChat
+                sessionId={sessionId}
+                token={token}
+                messages={state.messages}
+                partnerName={partnerName}
+                onSent={() => void booth.refresh()}
+                className="h-full"
+              />
+            )
           }
         />
       ) : (
@@ -134,7 +139,38 @@ type ScreenProps = {
   justPaid: boolean;
   cancelled: boolean;
   onAway: () => void;
+  /** Color or black & white for the live cameras (this device's choice). */
+  look: { filter: StripFilter; setFilter: (f: StripFilter) => void };
 };
+
+/**
+ * This device's live-camera look, remembered per photobooth so it survives a reload.
+ * Storage can be unavailable (private mode) — then it simply isn't remembered.
+ */
+function useCameraFilter(sessionId: string): [StripFilter, (f: StripFilter) => void] {
+  const key = `lw:booth-filter:${sessionId}`;
+  // Read once on the first client render (the booth shows a loading screen until then, so
+  // nothing on screen depends on this during hydration).
+  const [filter, setFilter] = useState<StripFilter>(() => {
+    try {
+      return typeof window !== "undefined" && localStorage.getItem(key) === "bw" ? "bw" : "color";
+    } catch {
+      return "color";
+    }
+  });
+  const set = useCallback(
+    (f: StripFilter) => {
+      setFilter(f);
+      try {
+        localStorage.setItem(key, f);
+      } catch {
+        // not remembered
+      }
+    },
+    [key],
+  );
+  return [filter, set];
+}
 
 /** Screens that get the three-column stage (preview · main · chat). */
 function isWide(state: BoothState) {
@@ -153,9 +189,9 @@ function Screen(props: ScreenProps) {
     case "IN_PROGRESS":
       return <Rounds {...props} />;
     case "DESIGNING":
-      return <DesignStep booth={props.booth} state={state} />;
+      return <DesignStep booth={props.booth} state={state} cameraFilter={props.look.filter} />;
     case "GENERATING":
-      return <Generating />;
+      return <Generating count={state.photoCount} />;
     case "FINALIZATION_FAILED":
       return <FinalizeFailed booth={props.booth} />;
     case "COMPLETED":
@@ -165,8 +201,19 @@ function Screen(props: ScreenProps) {
   }
 }
 
-/** Desktop: preview | main | chat. Phones: main first, then preview + chat side by side. */
+/**
+ * Desktop: preview | main | chat. Phones: main first, then preview + chat side by side.
+ * Without chat (solo): preview | main on desktop; on phones the preview sits under main.
+ */
 function Stage({ left, main, right }: { left: ReactNode; main: ReactNode; right: ReactNode }) {
+  if (!right) {
+    return (
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,190px)_minmax(0,1fr)] lg:items-start">
+        <div className="min-w-0 lg:col-start-2 lg:row-start-1">{main}</div>
+        {left && <aside className="mx-auto w-28 min-w-0 sm:w-36 lg:sticky lg:top-4 lg:col-start-1 lg:row-start-1 lg:w-auto">{left}</aside>}
+      </div>
+    );
+  }
   return (
     <div className={`grid gap-4 lg:items-start ${left ? "lg:grid-cols-[minmax(0,190px)_minmax(0,1fr)_minmax(0,320px)]" : "lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]"}`}>
       <div className={`min-w-0 lg:row-start-1 ${left ? "lg:col-start-2" : "lg:col-start-1"}`}>{main}</div>
@@ -181,12 +228,12 @@ function Stage({ left, main, right }: { left: ReactNode; main: ReactNode; right:
 }
 
 /** The strip as it will look, filling in as photos are kept (and showing your pick while choosing). */
-function LivePreview({ state }: { state: BoothState }) {
+function LivePreview({ state, cameraFilter }: { state: BoothState; cameraFilter: StripFilter }) {
   const frame = getFrame(state.me.pick.frame ?? state.frameId) ?? getFrame(DEFAULT_FRAME_ID)!;
-  const filter: StripFilter = state.me.pick.filter ?? state.finalFilter ?? (frame.grayscale ? "bw" : "color");
+  const filter: StripFilter = state.me.pick.filter ?? state.finalFilter ?? cameraFilter;
   return (
     <div>
-      <StripPreview frame={frame} approved={state.approved} filter={filter} />
+      <StripPreview frame={frame} approved={state.approved} filter={filter} solo={state.solo} />
       <p className="mt-2 text-center text-[11px] leading-tight text-ink-soft">
         Your strip · {state.approved.length}/4
       </p>
@@ -277,7 +324,8 @@ function PaymentScreen({ state, sessionId, token, justPaid, cancelled }: ScreenP
         <>
           <p className="font-display text-2xl">{state.paymentStatus === "PAYMENT_FAILED" ? "That payment didn't go through" : "One step left"}</p>
           <p className="mt-2 text-ink-soft">
-            {cancelled ? "No worries — you haven't been charged. " : ""}Pay {formatPeso(state.priceCentavos)} to open your photobooth. Your person joins free.
+            {cancelled ? "No worries — you haven't been charged. " : ""}Pay {formatPeso(state.priceCentavos)} to open your photobooth.
+            {state.solo ? "" : " Your person joins free."}
           </p>
           <Button className="mt-5 w-full" onClick={pay} busy={busy} busyLabel="Opening payment…">
             Pay {formatPeso(state.priceCentavos)}
@@ -313,7 +361,11 @@ function NameStep({ booth, state }: { booth: Booth; state: BoothState }) {
       >
         <h1 className="font-display text-3xl">What should we call you?</h1>
         <p className="mt-2 text-sm text-ink-soft">
-          {state.partner.name ? `${state.partner.name} will see this name.` : "Your person will see this name in the photobooth."}
+          {state.solo
+            ? "So we can say hi — it's only shown to you."
+            : state.partner.name
+              ? `${state.partner.name} will see this name.`
+              : "Your person will see this name in the photobooth."}
         </p>
         <input
           value={name}
@@ -334,8 +386,8 @@ function NameStep({ booth, state }: { booth: Booth; state: BoothState }) {
   );
 }
 
-function Lobby({ booth, state, camera, live, myLink, onAway }: ScreenProps) {
-  const { me, partner } = state;
+function Lobby({ booth, state, camera, live, myLink, onAway, look }: ScreenProps) {
+  const { me, partner, solo } = state;
   const partnerName = partner.name ?? "your person";
   const [busy, setBusy] = useState(false);
   const [agree, setAgree] = useState(false);
@@ -381,10 +433,11 @@ function Lobby({ booth, state, camera, live, myLink, onAway }: ScreenProps) {
         <div className="text-center">
           <h1 className="font-display text-3xl">Hi {me.name}! Let&rsquo;s make sure your camera works.</h1>
           <p className="mt-2 text-ink-soft">
-            {me.role === "A" ? "We'll check your camera before you invite your person." : "A quick check before your photobooth starts."}
+            {me.role === "A" && !solo ? "We'll check your camera before you invite your person." : "A quick check before your photobooth starts."}
           </p>
         </div>
-        <CameraView camera={camera} />
+        <CameraView camera={camera} mono={look.filter === "bw"} />
+        {camera.status === "ready" && <FilterToggle value={look.filter} onChange={look.setFilter} />}
         {camera.status === "ready" ? (
           <>
             <p className="flex items-center justify-center gap-2 font-medium text-emerald-700">
@@ -405,7 +458,8 @@ function Lobby({ booth, state, camera, live, myLink, onAway }: ScreenProps) {
   }
 
   // Person A starts the photobooth (after reading the 7-day rule); Person B waits for them.
-  const partnerSet = partner.joined && partner.connected && partner.cameraReady;
+  // Solo: nobody to wait for.
+  const partnerSet = solo || (partner.joined && partner.connected && partner.cameraReady);
   const waitingFor = !partner.joined
     ? `Waiting for ${partnerName}…`
     : !partner.name
@@ -420,7 +474,7 @@ function Lobby({ booth, state, camera, live, myLink, onAway }: ScreenProps) {
     me.role === "A" ? (
       me.acknowledged ? (
         <Card className="text-center">
-          <p className="font-medium">Starting as soon as {partnerName}&rsquo;s camera is on…</p>
+          <p className="font-medium">{solo ? "Starting your photobooth…" : <>Starting as soon as {partnerName}&rsquo;s camera is on…</>}</p>
         </Card>
       ) : showRules ? (
         <Card className={`ring-2 ring-rose shadow-[0_18px_40px_-20px_rgba(196,72,106,0.6)] ${s.enter}`}>
@@ -431,7 +485,7 @@ function Lobby({ booth, state, camera, live, myLink, onAway }: ScreenProps) {
           </p>
           <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-white p-3 text-sm ring-1 ring-line">
             <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-rose" />
-            <span>I understand that our photos will be deleted after {PHOTOBOOTH_RETENTION_DAYS} days.</span>
+            <span>I understand that {solo ? "my" : "our"} photos will be deleted after {PHOTOBOOTH_RETENTION_DAYS} days.</span>
           </label>
           <div className="mt-3 grid grid-cols-[auto_1fr] gap-2">
             <Button variant="secondary" onClick={() => setShowRules(false)}>
@@ -464,17 +518,24 @@ function Lobby({ booth, state, camera, live, myLink, onAway }: ScreenProps) {
       {camera.status === "error" && camera.issue ? (
         <CameraTrouble paid={me.role === "A"} issue={camera.issue} onRetry={retryCamera} retrying={false} myLink={myLink} onLater={onAway} />
       ) : (
-        <SplitView camera={camera} role={me.role} live={live} partnerName={partner.name ?? "Your person"} />
+        <>
+          <SplitView camera={camera} role={me.role} live={live} partnerName={partner.name ?? "Your person"} solo={solo} mono={look.filter === "bw"} />
+          <FilterToggle value={look.filter} onChange={look.setFilter} />
+        </>
       )}
 
       {startCard}
 
-      <Card>
-        <PartnerStatus partner={partner} waitingFor={waitingFor} />
-        <div className="mt-2 border-t border-line pt-2">
-          <ConnectionBadge quality={booth.quality} />
-        </div>
-      </Card>
+      {solo ? (
+        <ConnectionBadge quality={booth.quality} />
+      ) : (
+        <Card>
+          <PartnerStatus partner={partner} waitingFor={waitingFor} />
+          <div className="mt-2 border-t border-line pt-2">
+            <ConnectionBadge quality={booth.quality} />
+          </div>
+        </Card>
+      )}
 
       {me.role === "A" && state.inviteLink && <InviteCard link={state.inviteLink} joined={partner.joined} myName={me.name} />}
       {error && <p role="alert" className="text-center text-sm text-danger">{error}</p>}
@@ -511,11 +572,12 @@ function InviteCard({ link, joined, myName }: { link: string; joined: boolean; m
   );
 }
 
-// ─── The four photos ────────────────────────────────────────────────────────
+// ─── The photos ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }: ScreenProps) {
-  const { me, partner, phase, attempt, round } = state;
+function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway, look }: ScreenProps) {
+  const { me, partner, phase, attempt, round, solo } = state;
   const partnerName = partner.name ?? "Your person";
+  const mono = look.filter === "bw";
   const step = `${attempt}:${phase}`;
   const [busyStep, setBusyStep] = useState<string | null>(null);
   const busy = busyStep === step;
@@ -541,11 +603,12 @@ function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }
     shotFor.current = attempt;
     setSaving(true);
     setError(null);
-    let blob = await camera.capture();
-    if (!blob && !(await camera.start())) blob = await camera.capture();
+    const shape = solo ? "solo" : "pair";
+    let blob = await camera.capture(shape);
+    if (!blob && !(await camera.start())) blob = await camera.capture(shape);
     if (!blob) {
       setSaving(false);
-      setError("We couldn't take that photo — your camera stopped. We'll restart this photo for both of you.");
+      setError(`We couldn't take that photo — your camera stopped. We'll restart this photo${solo ? "" : " for both of you"}.`);
       return;
     }
     for (let tries = 0; tries < 4; tries++) {
@@ -564,14 +627,19 @@ function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }
     }
     setSaving(false);
     void booth.refresh();
-  }, [attempt, camera, sessionId, token, booth]);
+  }, [attempt, camera, sessionId, token, booth, solo]);
 
-  const partnerAway = partner.joined && !partner.connected;
+  const partnerAway = !solo && partner.joined && !partner.connected;
+  // Review: your photo and theirs, in the same order as the strip (A left, B right).
+  const reviewPhotos = state.review
+    ? [{ p: state.review.mine, who: "You" }, ...(state.review.theirs ? [{ p: state.review.theirs, who: partnerName }] : [])]
+    : [];
+  if (me.role === "B") reviewPhotos.reverse();
   const longAway = partnerAway && (partner.awayMs ?? 0) > RECONNECT_WINDOW_MS;
 
   return (
     <div className="space-y-4">
-      <Progress round={round} done={round - 1} />
+      <Progress round={round} done={round - 1} total={state.photoCount} />
       <ConnectionBadge quality={booth.quality} />
 
       {state.notice && phase === "READY" && (
@@ -599,27 +667,22 @@ function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }
 
       {phase === "REVIEW" && state.review ? (
         <Card className={s.enter}>
-          <div className="grid grid-cols-2 gap-3">
-            {(me.role === "A"
-              ? [
-                  { p: state.review.mine, who: "You" },
-                  { p: state.review.theirs, who: partnerName },
-                ]
-              : [
-                  { p: state.review.theirs, who: partnerName },
-                  { p: state.review.mine, who: "You" },
-                ]
-            ).map(({ p, who }) => (
+          <div className={solo ? "mx-auto max-w-md" : "grid grid-cols-2 gap-3"}>
+            {reviewPhotos.map(({ p, who }) => (
               <figure key={p.key} className="m-0">
-                <img src={stableUrl(p)} alt={`${who} — photo ${round}`} className="aspect-[3/4] w-full rounded-2xl object-cover shadow-md" />
-                <figcaption className="mt-1.5 text-center text-xs font-medium text-ink-soft">{who}</figcaption>
+                <img
+                  src={stableUrl(p)}
+                  alt={`${who} — photo ${round}`}
+                  className={`${solo ? "aspect-[3/2]" : "aspect-[3/4]"} w-full rounded-2xl object-cover shadow-md ${mono ? s.mono : ""}`}
+                />
+                {!solo && <figcaption className="mt-1.5 text-center text-xs font-medium text-ink-soft">{who}</figcaption>}
               </figure>
             ))}
           </div>
           {me.decision ? (
             <p className="mt-4 text-center text-sm text-ink-soft">
               {me.decision === "KEEP" ? "You kept this one ✓ " : ""}
-              {partner.decision ? "" : `Waiting for ${partnerName}…`}
+              {solo || partner.decision ? "" : `Waiting for ${partnerName}…`}
             </p>
           ) : (
             <>
@@ -632,21 +695,22 @@ function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }
                   Keep ❤️
                 </Button>
               </div>
-              <p className="mt-2 text-center text-xs text-ink-soft">You both need to keep it. If either of you wants a retake, you both retake it.</p>
+              {!solo && <p className="mt-2 text-center text-xs text-ink-soft">You both need to keep it. If either of you wants a retake, you both retake it.</p>}
             </>
           )}
         </Card>
       ) : (
         <>
-          <SplitView camera={camera} role={me.role} live={live} partnerName={partnerName}>
+          <SplitView camera={camera} role={me.role} live={live} partnerName={partnerName} solo={solo} mono={mono}>
             {phase === "COUNTDOWN" && state.captureAt && !me.uploaded && <Countdown captureAt={state.captureAt} serverNow={booth.serverNow} onCapture={() => void onCapture()} />}
             {phase === "COUNTDOWN" && (me.uploaded || saving) && (
               <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-black/50 px-4 py-3 text-center text-sm text-white backdrop-blur">
-                {saving && !me.uploaded ? "Saving your photo…" : `Got it! Waiting for ${partnerName}'s photo…`}
+                {saving && !me.uploaded ? "Saving your photo…" : solo ? "Got it!" : `Got it! Waiting for ${partnerName}'s photo…`}
               </div>
             )}
           </SplitView>
-          {phase === "READY" && live.status === "connected" && (
+          {phase === "READY" && <FilterToggle value={look.filter} onChange={look.setFilter} />}
+          {phase === "READY" && !solo && live.status === "connected" && (
             <p className="text-center text-xs text-ink-soft">This is how you&rsquo;ll appear side by side on your strip — strike a pose together.</p>
           )}
           {phase === "READY" && (
@@ -654,7 +718,7 @@ function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }
               <p className="text-center font-display text-xl">Get ready.</p>
               {me.ready ? (
                 <p className="rounded-full bg-white py-3 text-center text-sm font-medium ring-1 ring-line">
-                  {partner.ready ? "Here we go!" : `You're ready ✓ — waiting for ${partnerName}…`}
+                  {solo || partner.ready ? "Here we go!" : `You're ready ✓ — waiting for ${partnerName}…`}
                 </p>
               ) : (
                 <Button className="w-full py-4 text-base" busy={busy} disabled={camera.status !== "ready"} onClick={() => void act("/ready", { attempt })}>
@@ -671,20 +735,21 @@ function Rounds({ booth, state, camera, live, myLink, sessionId, token, onAway }
   );
 }
 
-// ─── Choose the look (after the four photos) ────────────────────────────────
+// ─── Choose the look (after the photos) ────────────────────────────────────────────────────────────────────
 
 const FILTERS: { id: StripFilter; label: string }[] = [
   { id: "bw", label: "Black & white" },
   { id: "color", label: "Color" },
 ];
 
-function DesignStep({ booth, state }: { booth: Booth; state: BoothState }) {
-  const { me, partner } = state;
+function DesignStep({ booth, state, cameraFilter }: { booth: Booth; state: BoothState; cameraFilter: StripFilter }) {
+  const { me, partner, solo } = state;
   const partnerName = partner.name ?? "Your person";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const frameId = me.pick.frame ?? DEFAULT_FRAME_ID;
-  const filter: StripFilter = me.pick.filter ?? "bw";
+  // Starts on the look they used for the live camera.
+  const filter: StripFilter = me.pick.filter ?? cameraFilter;
   const frame = getFrame(frameId) ?? getFrame(DEFAULT_FRAME_ID)!;
 
   const pick = async (next: { frameId?: string; filter?: StripFilter }, confirm = false) => {
@@ -703,7 +768,9 @@ function DesignStep({ booth, state }: { booth: Booth; state: BoothState }) {
   const label = (f: string | null, fl: StripFilter | null) =>
     `${FILTERS.find((x) => x.id === fl)?.label ?? "?"} · ${getFrame(f)?.name ?? "?"} frame`;
   let statusLine: string;
-  if (me.pick.confirmed && partner.pick.confirmed && !same) {
+  if (solo) {
+    statusLine = "Pick a filter and a frame, then make your strip.";
+  } else if (me.pick.confirmed && partner.pick.confirmed && !same) {
     statusLine = `You picked ${label(frameId, filter)}, ${partnerName} picked ${label(partner.pick.frame, partner.pick.filter)}. Choose the same look to make your strip — chat to decide!`;
   } else if (me.pick.confirmed) {
     statusLine = `Waiting for ${partnerName} to choose…`;
@@ -716,19 +783,19 @@ function DesignStep({ booth, state }: { booth: Booth; state: BoothState }) {
   const Badge = ({ mine, theirs }: { mine: boolean; theirs: boolean }) => (
     <span className="mt-1.5 flex min-h-5 flex-wrap justify-center gap-1">
       {mine && <span className="rounded-full bg-rose px-2 py-0.5 text-[10px] font-medium text-white">You</span>}
-      {theirs && <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-medium text-cream">{partnerName} picks this</span>}
+      {theirs && !solo && <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-medium text-cream">{partnerName} picks this</span>}
     </span>
   );
 
   return (
     <div className="space-y-4">
       <div className="text-center">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-ink-soft">All four photos are in ❤️</p>
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-ink-soft">All {state.photoCount} photos are in ❤️</p>
         <h1 className="mt-1 font-display text-3xl">Make it yours</h1>
       </div>
 
       <div className="mx-auto w-40 lg:hidden">
-        <StripPreview frame={frame} approved={state.approved} filter={filter} />
+        <StripPreview frame={frame} approved={state.approved} filter={filter} solo={solo} />
       </div>
 
       <Card>
@@ -768,7 +835,7 @@ function DesignStep({ booth, state }: { booth: Booth; state: BoothState }) {
                 aria-pressed={mine}
                 className={`rounded-2xl bg-white p-3 text-center transition ${mine ? "ring-2 ring-rose" : "ring-1 ring-line hover:ring-ink/30"}`}
               >
-                <span className="mx-auto block h-14 w-9 rounded-sm ring-1 ring-black/10" style={{ background: f.background }} />
+                <span className="mx-auto block h-14 max-w-full rounded-sm ring-1 ring-black/10" style={{ background: f.background, aspectRatio: `${f.width} / ${f.height}` }} />
                 <span className="mt-2 block text-sm font-medium">{f.name}</span>
                 <Badge mine={mine} theirs={partner.pick.frame === f.id} />
               </button>
@@ -786,7 +853,7 @@ function DesignStep({ booth, state }: { booth: Booth; state: BoothState }) {
         </p>
       ) : (
         <Button className="w-full py-4 text-base" busy={busy} onClick={() => void pick({}, true)}>
-          Use this look
+          {solo ? "Make my strip" : "Use this look"}
         </Button>
       )}
       {error && <p role="alert" className="text-center text-sm text-danger">{error}</p>}
@@ -796,16 +863,16 @@ function DesignStep({ booth, state }: { booth: Booth; state: BoothState }) {
 
 // ─── After choosing ─────────────────────────────────────────────────────────
 
-function Generating() {
+function Generating({ count }: { count: number }) {
   return (
     <Card className="text-center">
       <div className="mx-auto flex w-16 flex-col gap-1.5 rounded-md bg-ink p-1.5" aria-hidden>
-        {[0, 1, 2, 3].map((i) => (
+        {Array.from({ length: count }, (_, i) => (
           <span key={i} className={`h-8 rounded-sm bg-white/80 ${s.pulse}`} style={{ animationDelay: `${i * 0.2}s` }} />
         ))}
       </div>
       <p className="mt-5 font-display text-2xl">Generating your photobooth…</p>
-      <p className="mt-2 text-sm text-ink-soft">Putting your four moments together. This takes a few seconds.</p>
+      <p className="mt-2 text-sm text-ink-soft">Putting your moments together. This takes a few seconds.</p>
     </Card>
   );
 }
@@ -815,7 +882,7 @@ function FinalizeFailed({ booth }: { booth: Booth }) {
   return (
     <Card className="text-center">
       <p className="font-display text-2xl">We couldn&rsquo;t finish your photobooth right now.</p>
-      <p className="mt-2 text-ink-soft">Your session is still safe — all four photos are saved. Please try again.</p>
+      <p className="mt-2 text-ink-soft">Your session is still safe — all your photos are saved. Please try again.</p>
       <Button
         className="mt-5 w-full"
         busy={busy}
@@ -837,17 +904,30 @@ function FinalizeFailed({ booth }: { booth: Booth }) {
 function Result({ state }: { state: BoothState }) {
   const result = state.result;
   if (!result) return <Ended />;
+  // A wide (landscape) frame gets a wide image; a classic strip stays narrow.
+  const shape = getFrame(state.frameId);
+  const landscape = Boolean(shape && shape.width > shape.height);
   const until = new Intl.DateTimeFormat("en-US", { dateStyle: "long", timeZone: PHOTOBOOTH_TIMEZONE }).format(new Date(result.expiresAt));
-  const names = state.me.name && state.partner.name ? (state.me.role === "A" ? `${state.me.name} & ${state.partner.name}` : `${state.partner.name} & ${state.me.name}`) : null;
+  const names = state.solo
+    ? null
+    : state.me.name && state.partner.name
+      ? state.me.role === "A"
+        ? `${state.me.name} & ${state.partner.name}`
+        : `${state.partner.name} & ${state.me.name}`
+      : null;
   return (
     <div className="space-y-6 text-center">
       <div>
         <h1 className="font-display text-3xl sm:text-4xl">
-          You made a little memory together. <HeartIcon size={24} className="inline text-rose" />
+          {state.solo ? "You made a little memory." : "You made a little memory together."} <HeartIcon size={24} className="inline text-rose" />
         </h1>
         {names && <p className="mt-2 text-ink-soft">{names}</p>}
       </div>
-      <img src={result.strip.url} alt="Your photobooth strip" className={`mx-auto w-full max-w-[17rem] rounded-sm shadow-[0_30px_60px_-25px_rgba(0,0,0,0.6)] ${s.strip}`} />
+      <img
+        src={result.strip.url}
+        alt="Your photobooth strip"
+        className={`mx-auto w-full rounded-sm shadow-[0_30px_60px_-25px_rgba(0,0,0,0.6)] ${landscape ? "max-w-2xl" : "max-w-[17rem]"} ${s.strip}`}
+      />
       <div className="mx-auto max-w-sm space-y-2">
         <a href={result.strip.download} className="lw-press flex w-full items-center justify-center gap-2 rounded-full bg-rose px-5 py-4 font-medium text-white hover:bg-rose-deep">
           Download Photo Strip
@@ -855,7 +935,7 @@ function Result({ state }: { state: BoothState }) {
         <p className="text-xs text-ink-soft">On iPhone you can also press and hold the strip to save it to Photos.</p>
       </div>
       <Card>
-        <h2 className="font-display text-lg">Your four photos</h2>
+        <h2 className="font-display text-lg">Your photos</h2>
         <div className="mt-3 grid grid-cols-2 gap-3">
           {result.photos.map((p) => (
             <a key={p.round} href={p.download} className="group block rounded-xl bg-white p-1.5 text-sm ring-1 ring-line hover:ring-rose">

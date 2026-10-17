@@ -62,6 +62,10 @@ export interface BoothPersonState {
 export interface BoothState {
   serverNow: number;
   sessionId: string;
+  /** A one-person photobooth: no partner, no invite, no chat, one photo per moment. */
+  solo: boolean;
+  /** How many photos this photobooth takes. */
+  photoCount: number;
   status: BoothStatus;
   paymentStatus: "UNPAID" | "AWAITING_PAYMENT" | "PAID" | "PAYMENT_FAILED";
   priceCentavos: number;
@@ -75,14 +79,15 @@ export interface BoothState {
   notice: { kind: "retake"; by: "me" | "partner" } | { kind: "aborted" } | null;
   realtimeKey: string;
   me: BoothPersonState & { role: BoothRole };
+  /** The other person (in a solo photobooth: an empty placeholder — check `solo`). */
   partner: BoothPersonState;
   /** The partner's latest live-view signal (only while the photobooth is running). */
   partnerSignal: RtcSignal | null;
   /** Person A only: the invite link for Person B. */
   inviteLink: string | null;
-  review: { mine: SignedPhoto; theirs: SignedPhoto } | null;
-  /** Approved photos so far (for the live strip preview): Person A's and B's per photo number. */
-  approved: { round: number; a: SignedPhoto; b: SignedPhoto }[];
+  review: { mine: SignedPhoto; theirs: SignedPhoto | null } | null;
+  /** Approved photos so far (for the live strip preview): Person A's and B's per photo number (B is null when solo). */
+  approved: { round: number; a: SignedPhoto; b: SignedPhoto | null }[];
   /** The chosen filter once the strip is being made. */
   finalFilter: StripFilter | null;
   messages: ChatMessage[];

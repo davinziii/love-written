@@ -143,6 +143,10 @@ export interface PhotoboothSessionRow {
   status: import("@/lib/photobooth/types").BoothStatus;
   payment_status: PaymentStatus;
   price_centavos: number;
+  /** 1 = solo (Person A alone), 2 = Person A + invited Person B. */
+  party_size: 1 | 2;
+  /** How many photos this session takes (3; sessions from before migration 0009 took 4). */
+  photo_count: number;
   create_key: string | null;
   frame_id: string | null;
   current_round: number;

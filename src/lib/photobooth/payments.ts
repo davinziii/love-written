@@ -23,17 +23,23 @@ const REUSE_OPEN_SESSION_MS = 60 * 60_000;
 // ─── Self-serve (PayMongo) ──────────────────────────────────────────────────
 
 /**
- * Create the session + both participants before payment. Idempotent per `createKey`
- * (a double click returns the same session and the same Person A link).
+ * Create the session + its participants (Person A, plus Person B unless solo) before payment.
+ * Idempotent per `createKey` (a double click returns the same session and Person A link).
  */
-export async function createPendingBooth(createKey: string): Promise<{ sessionId: string; token: string }> {
+export async function createPendingBooth(createKey: string, partySize: 1 | 2 = 2): Promise<{ sessionId: string; token: string }> {
   const existing = await sessionByCreateKey(createKey);
   if (existing) return existing;
 
   const creds = newParticipantCredentials();
   const { data: session, error } = await db()
     .from("photobooth_sessions")
-    .insert({ status: "AWAITING_PAYMENT", payment_status: "UNPAID", price_centavos: photoboothPriceCentavos(), create_key: createKey })
+    .insert({
+      status: "AWAITING_PAYMENT",
+      payment_status: "UNPAID",
+      price_centavos: photoboothPriceCentavos(partySize),
+      create_key: createKey,
+      party_size: partySize,
+    })
     .select("id")
     .single();
   if (error) {
@@ -44,12 +50,14 @@ export async function createPendingBooth(createKey: string): Promise<{ sessionId
     throw new Error(`create photobooth: ${error.message}`);
   }
   const sessionId = session.id as string;
-  const { error: pError } = await db().from("photobooth_participants").insert([
-    { session_id: sessionId, role: "A", token_hash: creds.aHash, token_enc: creds.aEnc },
-    { session_id: sessionId, role: "B", token_hash: creds.bHash, token_enc: creds.bEnc },
-  ]);
+  const { error: pError } = await db()
+    .from("photobooth_participants")
+    .insert([
+      { session_id: sessionId, role: "A", token_hash: creds.aHash, token_enc: creds.aEnc },
+      ...(partySize === 2 ? [{ session_id: sessionId, role: "B", token_hash: creds.bHash, token_enc: creds.bEnc }] : []),
+    ]);
   if (pError) throw new Error(`create participants: ${pError.message}`);
-  log.info("photobooth_created", { sessionId, source: "self_serve" });
+  log.info("photobooth_created", { sessionId, source: "self_serve", partySize });
   return { sessionId, token: creds.a };
 }
 
@@ -124,7 +132,10 @@ export async function startBoothCheckout(session: PhotoboothSessionRow, idempote
       orderNumber: order.order_number,
       amountCentavos: amount,
       itemName: "Love, Written Photobooth",
-      itemDescription: "A private two-person photobooth session — photos kept for 7 days after you finish",
+      itemDescription:
+        session.party_size === 1
+          ? "A private photobooth session — photos kept for 7 days after you finish"
+          : "A private two-person photobooth session — photos kept for 7 days after you finish",
       metadata: { photobooth_session_id: session.id },
       successUrl: `${site}/photobooth/s/${session.id}?paid=1`,
       cancelUrl: `${site}/photobooth/s/${session.id}?payment=cancelled`,
@@ -158,6 +169,8 @@ export interface ManualBoothInput {
   customerLabel?: string;
   notes?: string;
   idempotencyKey: string;
+  /** 1 = solo, 2 = Person A + an invited Person B. */
+  partySize: 1 | 2;
 }
 
 export interface IssuedBooth {
@@ -183,18 +196,19 @@ export async function createManualBooth(input: ManualBoothInput, adminId: string
     p_payment_reference: input.paymentReference?.trim() ?? "",
     p_notes: input.notes?.trim() ?? "",
     p_admin: adminId,
+    p_party_size: input.partySize,
   });
   if (error) throw new Error(`create manual photobooth: ${error.message}`);
   const row = (Array.isArray(data) ? data[0] : data) as { session_id: string; order_number: string; replayed: boolean } | undefined;
   if (!row) throw new Error("create manual photobooth: no result");
 
-  log.info("photobooth_created", { sessionId: row.session_id, source: "manual", adminId, replayed: row.replayed });
+  log.info("photobooth_created", { sessionId: row.session_id, source: "manual", adminId, replayed: row.replayed, partySize: input.partySize });
   if (!row.replayed) log.info("photobooth_payment_confirmed", { sessionId: row.session_id, method: "manual" });
   return {
     sessionId: row.session_id,
     orderNumber: row.order_number,
     linkA: row.replayed ? null : participantLink(row.session_id, creds.a),
-    linkB: row.replayed ? null : participantLink(row.session_id, creds.b),
+    linkB: row.replayed || input.partySize === 1 ? null : participantLink(row.session_id, creds.b),
     replayed: row.replayed,
   };
 }

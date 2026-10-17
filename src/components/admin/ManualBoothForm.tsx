@@ -30,6 +30,23 @@ export function ManualBoothForm({ defaultAmountPesos, idempotencyKey }: { defaul
   return (
     <form action={action} className="space-y-5">
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">Who&rsquo;s in the photobooth</legend>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {[
+            { value: "2", label: "Two people", hint: "Their own link + an invite link for their person" },
+            { value: "1", label: "Just one person", hint: "One link · no invite, no chat · one photo per moment" },
+          ].map((o) => (
+            <label key={o.value} className="flex cursor-pointer items-start gap-3 rounded-2xl bg-soft px-4 py-3 text-sm ring-1 ring-transparent has-[:checked]:bg-white has-[:checked]:ring-rose/40">
+              <input type="radio" name="partySize" value={o.value} defaultChecked={o.value === "2"} className="mt-0.5 accent-rose" />
+              <span>
+                <span className="block font-medium">{o.label}</span>
+                <span className="block text-xs text-ink-soft">{o.hint}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block space-y-2 text-sm font-medium">
           Amount received (₱)

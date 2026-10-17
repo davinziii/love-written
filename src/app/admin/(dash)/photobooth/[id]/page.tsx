@@ -39,9 +39,10 @@ export default async function PhotoboothDetailPage({ params }: Props) {
                   {order && <Badge value={order.payment_method === "manual" ? "MANUAL" : "PAYMONGO"} />}
                 </span>
               </Item>
+              <Item label="People">{b.party_size === 1 ? "Just one (solo)" : "Two"}</Item>
               <Item label="Customer">{order?.customer_label ?? "—"}</Item>
               <Item label="Amount">{formatPeso(order?.amount_centavos ?? b.price_centavos)}</Item>
-              <Item label="Photo">{b.status === "IN_PROGRESS" ? `${b.current_round} of 4` : b.completed_at ? "4 of 4 ✓" : "—"}</Item>
+              <Item label="Photo">{b.status === "IN_PROGRESS" ? `${b.current_round} of ${b.photo_count}` : b.completed_at ? `${b.photo_count} of ${b.photo_count} ✓` : "—"}</Item>
               <Item label="Design">{b.frame_id ?? "—"}</Item>
               <Item label="Paid">{fmt(b.paid_at)}</Item>
               <Item label="Last activity">{fmt(b.last_activity_at)}</Item>
@@ -57,7 +58,7 @@ export default async function PhotoboothDetailPage({ params }: Props) {
           <Card>
             <h2 className="font-display text-lg">People</h2>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {(["A", "B"] as const).map((role) => {
+              {(b.party_size === 1 ? (["A"] as const) : (["A", "B"] as const)).map((role) => {
                 const p = b.photobooth_participants.find((x) => x.role === role);
                 const online = isOnline(p?.last_seen_at ?? null);
                 return (
@@ -114,7 +115,7 @@ export default async function PhotoboothDetailPage({ params }: Props) {
 
         <aside className="space-y-4 xl:sticky xl:top-8 xl:self-start">
           {links.a ? (
-            <BoothLinksCard linkA={links.a} linkB={links.b} orderNumber={order?.order_number} />
+            <BoothLinksCard linkA={links.a} linkB={links.b} orderNumber={order?.order_number} solo={b.party_size === 1} />
           ) : (
             <Card>
               <p className="text-sm text-ink-soft">Links are no longer available for this photobooth.</p>

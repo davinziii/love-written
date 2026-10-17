@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CAPTURE_HEIGHT, CAPTURE_WIDTH } from "@/lib/photobooth/constants";
+import { CAPTURE_HEIGHT, CAPTURE_WIDTH, SOLO_CAPTURE_HEIGHT, SOLO_CAPTURE_WIDTH } from "@/lib/photobooth/constants";
 import type { CameraIssue } from "@/lib/photobooth/types";
 
 export type CameraStatus = "idle" | "starting" | "ready" | "error";
@@ -84,24 +84,27 @@ export function useCamera() {
   }, []);
 
   /**
-   * Grab a 3:4 still exactly as the mirrored preview shows it — when two people pose side by
+   * Grab a still exactly as the mirrored preview shows it — when two people pose side by
    * side (leaning toward each other, making a heart together), the strip matches what they saw.
+   * "pair": 3:4 portrait (two of them fill a strip slot). "solo": 3:2 landscape (one fills it).
    */
-  const capture = useCallback(async (): Promise<Blob | null> => {
+  const capture = useCallback(async (shape: "pair" | "solo" = "pair"): Promise<Blob | null> => {
     const v = video.current;
     if (!v || !stream.current?.active || !v.videoWidth || !v.videoHeight) return null;
-    const target = CAPTURE_WIDTH / CAPTURE_HEIGHT;
+    const width = shape === "solo" ? SOLO_CAPTURE_WIDTH : CAPTURE_WIDTH;
+    const height = shape === "solo" ? SOLO_CAPTURE_HEIGHT : CAPTURE_HEIGHT;
+    const target = width / height;
     const source = v.videoWidth / v.videoHeight;
     const sw = source > target ? v.videoHeight * target : v.videoWidth;
     const sh = source > target ? v.videoHeight : v.videoWidth / target;
     const canvas = document.createElement("canvas");
-    canvas.width = CAPTURE_WIDTH;
-    canvas.height = CAPTURE_HEIGHT;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    ctx.translate(CAPTURE_WIDTH, 0);
+    ctx.translate(width, 0);
     ctx.scale(-1, 1);
-    ctx.drawImage(v, (v.videoWidth - sw) / 2, (v.videoHeight - sh) / 2, sw, sh, 0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT);
+    ctx.drawImage(v, (v.videoWidth - sw) / 2, (v.videoHeight - sh) / 2, sw, sh, 0, 0, width, height);
     return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.88));
   }, []);
 

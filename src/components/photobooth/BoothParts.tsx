@@ -14,14 +14,30 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
   return <section className={`rounded-[1.75rem] bg-paper p-5 ring-1 ring-line sm:p-6 ${className}`}>{children}</section>;
 }
 
-export function CameraView({ camera, children, dim = false }: { camera: Camera; children?: ReactNode; dim?: boolean }) {
-  return <CameraFrame attach={camera.attach} status={camera.status} dim={dim}>{children}</CameraFrame>;
+export function CameraView({ camera, children, dim = false, mono = false }: { camera: Camera; children?: ReactNode; dim?: boolean; mono?: boolean }) {
+  return (
+    <CameraFrame attach={camera.attach} status={camera.status} dim={dim} mono={mono}>
+      {children}
+    </CameraFrame>
+  );
 }
 
-function CameraFrame({ attach, status, children, dim }: { attach: Camera["attach"]; status: Camera["status"]; children?: ReactNode; dim: boolean }) {
+function CameraFrame({
+  attach,
+  status,
+  children,
+  dim,
+  mono,
+}: {
+  attach: Camera["attach"];
+  status: Camera["status"];
+  children?: ReactNode;
+  dim: boolean;
+  mono: boolean;
+}) {
   return (
     <div className={s.camera}>
-      <video ref={attach} className={s.video} playsInline muted autoPlay aria-label="Your camera" />
+      <video ref={attach} className={`${s.video} ${mono ? s.mono : ""}`} playsInline muted autoPlay aria-label="Your camera" />
       {status !== "ready" && (
         <div className="absolute inset-0 grid place-items-center text-sm text-white/70">
           {status === "starting" ? "Starting your camera…" : "Camera is off"}
@@ -37,41 +53,77 @@ function CameraFrame({ attach, status, children, dim }: { attach: Camera["attach
  * You and your person side by side — always Person A on the left and Person B on the right,
  * exactly like each slot of the final strip, so poses line up the way they'll print.
  * Both are shown mirrored (as each of you sees yourself), which is also how photos are saved.
+ * Solo: just you, one bigger tile. `mono` shows the live video in black & white.
  */
 export function SplitView({
   camera,
   role,
   live,
   partnerName = "Your person",
+  solo = false,
+  mono = false,
   children,
 }: {
   camera: Camera;
   role: "A" | "B";
   live: { status: LiveStatus; remote: MediaStream | null; retry?: () => void };
   partnerName?: string;
+  solo?: boolean;
+  mono?: boolean;
   children?: ReactNode;
 }) {
-  const mine = <SelfTile key="me" attach={camera.attach} status={camera.status} />;
-  const theirs = <PartnerTile key="them" live={live} name={partnerName} />;
+  const mine = <SelfTile key="me" attach={camera.attach} status={camera.status} mono={mono} />;
+  const theirs = <PartnerTile key="them" live={live} name={partnerName} mono={mono} />;
   return (
-    <div className={s.split}>
-      {role === "A" ? [mine, theirs] : [theirs, mine]}
+    <div className={s.split} data-solo={solo ? "" : undefined}>
+      {solo ? mine : role === "A" ? [mine, theirs] : [theirs, mine]}
       {children}
     </div>
   );
 }
 
-function SelfTile({ attach, status }: { attach: Camera["attach"]; status: Camera["status"] }) {
+/**
+ * Color or black & white for the live cameras. Only changes how the video looks here — the
+ * photos are saved in color, and the strip's filter is chosen after the photos (this choice
+ * is pre-selected there).
+ */
+export function FilterToggle({ value, onChange }: { value: "bw" | "color"; onChange: (v: "bw" | "color") => void }) {
+  return (
+    <div className="flex justify-center">
+      <div className="inline-flex rounded-full bg-white p-1 ring-1 ring-line" role="radiogroup" aria-label="Camera colors">
+        {(
+          [
+            ["color", "Color"],
+            ["bw", "Black & white"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={value === id}
+            onClick={() => onChange(id)}
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${value === id ? "bg-ink text-cream" : "text-ink-soft hover:text-ink"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SelfTile({ attach, status, mono }: { attach: Camera["attach"]; status: Camera["status"]; mono: boolean }) {
   return (
     <div className={s.tile}>
-      <video ref={attach} className={s.video} playsInline muted autoPlay aria-label="Your camera" />
+      <video ref={attach} className={`${s.video} ${mono ? s.mono : ""}`} playsInline muted autoPlay aria-label="Your camera" />
       {status !== "ready" && <div className="absolute inset-0 grid place-items-center p-2 text-center text-xs text-white/70">{status === "starting" ? "Starting…" : "Camera off"}</div>}
       <span className={s.tileLabel}>You</span>
     </div>
   );
 }
 
-function PartnerTile({ live, name }: { live: { status: LiveStatus; remote: MediaStream | null; retry?: () => void }; name: string }) {
+function PartnerTile({ live, name, mono }: { live: { status: LiveStatus; remote: MediaStream | null; retry?: () => void }; name: string; mono: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const v = ref.current;
@@ -82,7 +134,7 @@ function PartnerTile({ live, name }: { live: { status: LiveStatus; remote: Media
   const showing = live.status === "connected" && live.remote;
   return (
     <div className={s.tile}>
-      <video ref={ref} className={s.video} playsInline muted autoPlay aria-label="Your person's camera" />
+      <video ref={ref} className={`${s.video} ${mono ? s.mono : ""}`} playsInline muted autoPlay aria-label="Your person's camera" />
       {!showing && (
         <div className="absolute inset-0 grid place-items-center p-3 text-center text-xs leading-snug text-white/75">
           {live.status === "unavailable" ? (
@@ -111,16 +163,16 @@ function PartnerTile({ live, name }: { live: { status: LiveStatus; remote: Media
   );
 }
 
-export function Progress({ round, done }: { round: number; done: number }) {
+export function Progress({ round, done, total = PHOTOBOOTH_ROUNDS }: { round: number; done: number; total?: number }) {
   return (
-    <div className="flex flex-col items-center gap-1.5" aria-label={`Photo ${round} of ${PHOTOBOOTH_ROUNDS}`}>
+    <div className="flex flex-col items-center gap-1.5" aria-label={`Photo ${round} of ${total}`}>
       <div className="flex gap-1.5" aria-hidden>
-        {Array.from({ length: PHOTOBOOTH_ROUNDS }, (_, i) => (
+        {Array.from({ length: total }, (_, i) => (
           <span key={i} className={`h-2.5 w-2.5 rounded-full transition ${i < done ? "bg-rose" : i === done ? "bg-rose/60 ring-2 ring-rose/25" : "bg-line"}`} />
         ))}
       </div>
       <p className="text-xs font-medium uppercase tracking-[0.18em] text-ink-soft">
-        Photo {round} of {PHOTOBOOTH_ROUNDS}
+        Photo {round} of {total}
       </p>
     </div>
   );

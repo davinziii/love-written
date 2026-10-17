@@ -281,6 +281,8 @@ export interface AdminBooth {
   id: string;
   status: string;
   payment_status: string;
+  party_size: 1 | 2;
+  photo_count: number;
   current_round: number;
   frame_id: string | null;
   price_centavos: number;
@@ -296,7 +298,7 @@ export interface AdminBooth {
   orders: { order_number: string; status: string; payment_method: string; customer_label: string | null; amount_centavos: number }[];
 }
 
-const BOOTH_COLUMNS = `id, status, payment_status, current_round, frame_id, price_centavos, paid_at, completed_at, expires_at,
+const BOOTH_COLUMNS = `id, status, payment_status, party_size, photo_count, current_round, frame_id, price_centavos, paid_at, completed_at, expires_at,
   last_activity_at, cleanup_attempts, cleanup_error, generation_error, created_at,
   photobooth_participants(role, display_name, joined_at, last_seen_at, camera_ready_at, camera_issue, camera_issue_at, deletion_ack_at),
   orders(order_number, status, payment_method, customer_label, amount_centavos)`;
