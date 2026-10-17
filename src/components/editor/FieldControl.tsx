@@ -132,6 +132,27 @@ export function FieldControl(props: FieldControlProps) {
         />
       );
       break;
+    case "choice":
+      control = (
+        <Dropdown
+          labelledBy={`${id}-label`}
+          describedBy={describedBy}
+          disabled={disabled}
+          value={value ?? field.default}
+          onChange={onChange}
+          options={field.options.map((opt) => ({
+            value: opt.id,
+            label: opt.hint ? `${opt.label} — ${opt.hint}` : opt.label,
+            render: (
+              <span className="block min-w-0 text-left">
+                <span className="block truncate text-sm font-medium text-ink">{opt.label}</span>
+                {opt.hint && <span className="mt-0.5 block text-[11px] leading-tight text-ink-soft">{opt.hint}</span>}
+              </span>
+            ),
+          }))}
+        />
+      );
+      break;
     case "music": {
       const tracks = MUSIC_LIBRARY.filter((t) => (field.options as readonly string[]).includes(t.id));
       control = (
@@ -179,7 +200,7 @@ export function FieldControl(props: FieldControlProps) {
     <div data-field={field.id} className={variant === "fill" ? "flex h-full flex-col gap-2" : "space-y-2"}>
       {/* min-h keeps labels on one baseline when fields sit side by side */}
       <div className="flex min-h-7 items-center justify-between gap-3">
-        <label id={`${id}-label`} htmlFor={field.type === "color" || field.type === "font" ? undefined : id} className="text-sm font-medium text-ink">
+        <label id={`${id}-label`} htmlFor={field.type === "color" || field.type === "font" || field.type === "choice" ? undefined : id} className="text-sm font-medium text-ink">
           {props.label ?? field.label}
           {field.required ? <span className="text-rose"> *</span> : <span className="font-normal text-ink-soft"> (optional)</span>}
         </label>

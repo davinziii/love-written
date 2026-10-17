@@ -100,3 +100,39 @@ describe("template registry", () => {
     });
   }
 });
+
+describe("choice fields (Loveflix photo mode)", () => {
+  const lf = TEMPLATES.loveflix as TemplateDefinition;
+  const lfImages = new Set(lf.fields.filter((f) => f.type === "image").map((f) => f.id));
+
+  it("defaults to black & white and stores it as a style value", () => {
+    const r = validateCustomerData(lf, { content: {}, style: {} }, { mode: "draft", imageFieldsPresent: noImages });
+    expect(r.data.style).toEqual({ photo_mode: "grayscale" });
+  });
+
+  it("accepts only its own options", () => {
+    const ok = validateCustomerData(lf, { style: { photo_mode: "color" } }, { mode: "draft", imageFieldsPresent: noImages });
+    expect(ok.data.style.photo_mode).toBe("color");
+    const bad = validateCustomerData(lf, { style: { photo_mode: "sepia" } }, { mode: "draft", imageFieldsPresent: noImages });
+    expect(bad.errors.photo_mode).toBeDefined();
+  });
+
+  it("requires the title, description, main photo and all five memory photos and messages", () => {
+    const r = validateCustomerData(lf, { content: {}, style: {} }, { mode: "strict", imageFieldsPresent: noImages });
+    expect(Object.keys(r.errors).sort()).toEqual(
+      [
+        "hero_photo",
+        "show_description",
+        "show_title",
+        ...[1, 2, 3, 4, 5].flatMap((n) => [`memory_photo_${n}`, `memory_message_${n}`]),
+      ].sort(),
+    );
+  });
+
+  it("the sample passes strict validation", () => {
+    const content: Record<string, string> = {};
+    for (const [k, v] of Object.entries(lf.sample)) if (!lfImages.has(k)) content[k] = v;
+    const r = validateCustomerData(lf, { content, style: lf.sample }, { mode: "strict", imageFieldsPresent: lfImages });
+    expect(r.errors).toEqual({});
+  });
+});

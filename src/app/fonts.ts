@@ -1,4 +1,5 @@
 import {
+  Bebas_Neue,
   Caveat,
   Cormorant_Garamond,
   Dancing_Script,
@@ -40,6 +41,10 @@ const dancing = Dancing_Script({ subsets: ["latin"], display: "swap", preload: f
 const caveat = Caveat({ subsets: ["latin"], display: "swap", preload: false, variable: "--font-caveat" });
 const playfair = Playfair_Display({ subsets: ["latin"], display: "swap", preload: false, variable: "--font-playfair", style: ["normal", "italic"] });
 
+// Template display fonts (used by a single template)
+/** The cinema-style wordmark in "Loveflix". */
+const bebas = Bebas_Neue({ subsets: ["latin"], display: "swap", preload: false, variable: "--font-bebas", weight: "400" });
+
 export const fontVariables = [
   inter,
   fraunces,
@@ -55,6 +60,7 @@ export const fontVariables = [
   dancing,
   caveat,
   playfair,
+  bebas,
 ]
   .map((f) => f.variable)
   .join(" ");

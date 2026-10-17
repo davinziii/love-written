@@ -109,6 +109,7 @@ Available field types (`src/templates/types.ts`):
 | `color` | theme dropdown | `options` (theme ids), `default` | `style` |
 | `font` | font dropdown, each option shown in its font | `options` (font ids), `default`, `previewText` | `style` |
 | `music` | track picker (hidden while the library is empty) | `options` (track ids) | `style` |
+| `choice` | dropdown of the template's own options | `options` (`{ id, label, hint? }`), `default` | `style` |
 
 Themes, fonts and music tracks are curated in `src/templates/styles.ts`.
 
@@ -164,6 +165,11 @@ same thing:
 3. A handwriting font (`final_font`, all `FINAL_FONT_IDS`) goes **right under the field it
    styles** (e.g. "Greeting font" under Greeting, "Final message font" under the final message).
 4. Every font picker is the same dropdown (automatic for `type: "font"`).
+
+**Exception — fixed-look templates.** A template whose design only works in one palette
+(e.g. **Loveflix**: black, red and white like a streaming service) leaves out `theme` and the
+fonts. Its Look & Feel group still comes first and holds whatever it does let customers change
+(Loveflix: `photo_mode` as a `choice` field, and the logo text).
 
 Renderers must look good with **every** theme, including the dark ones (`midnight`,
 `noir`) — e.g. text printed on light "paper" needs its own dark ink color.

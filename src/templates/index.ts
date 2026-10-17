@@ -10,10 +10,12 @@
 import type { TemplateDefinition } from "./types";
 import { ourStoryDefinition } from "./our-story/definition";
 import { letterForYouDefinition } from "./letter-for-you/definition";
+import { loveflixDefinition } from "./loveflix/definition";
 
 export const TEMPLATES = {
   "our-story": ourStoryDefinition,
   "letter-for-you": letterForYouDefinition,
+  loveflix: loveflixDefinition,
 } as const satisfies Record<string, TemplateDefinition>;
 
 export type TemplateId = keyof typeof TEMPLATES;

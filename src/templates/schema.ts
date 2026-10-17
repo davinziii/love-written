@@ -72,13 +72,15 @@ export function fieldValueSchema(field: FieldDef): z.ZodType<string> {
               MUSIC_LIBRARY.some((t: { id: string }) => t.id === v)),
           "Choose a track from the library",
         );
+    case "choice":
+      return z.string().refine((v) => field.options.some((o) => o.id === v), "Choose one of the options");
     case "image":
       return z.never();
   }
 }
 
 function styleDefault(field: FieldDef): string | undefined {
-  if (field.type === "color" || field.type === "font") return field.default;
+  if (field.type === "color" || field.type === "font" || field.type === "choice") return field.default;
   if (field.type === "music") return NO_MUSIC;
   return undefined;
 }

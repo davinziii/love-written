@@ -67,6 +67,8 @@ src/
     index.ts                   definition registry
     renderers.tsx              renderer registry (compile error if one is missing)
     our-story/                 definition.ts + OurStoryRenderer.tsx + CSS
+    letter-for-you/            A Letter for You (envelope, letter, 10–12 photos)
+    loveflix/                  Loveflix (streaming-style intro, profiles, title page, memory viewer)
   components/
     editor/                    GenericEditor + FieldControl (schema-driven, template-agnostic)
     studio/                    customer flow: edit → preview → pay → finalize / failed / scheduled / live

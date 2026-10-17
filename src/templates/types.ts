@@ -5,10 +5,10 @@ import type { FontId, ThemeId, TrackId } from "./styles";
  * Adding a new type means: add it here, teach `schema.ts` to validate it,
  * and teach `components/editor/FieldControl.tsx` to render a control for it.
  */
-export type FieldType = "text" | "textarea" | "image" | "date" | "color" | "font" | "music";
+export type FieldType = "text" | "textarea" | "image" | "date" | "color" | "font" | "music" | "choice";
 
 /** Style fields are stored in `surprises.style`; everything else in `surprises.content`/`media`. */
-export const STYLE_FIELD_TYPES = ["color", "font", "music"] as const;
+export const STYLE_FIELD_TYPES = ["color", "font", "music", "choice"] as const;
 export type StyleFieldType = (typeof STYLE_FIELD_TYPES)[number];
 
 interface BaseField {
@@ -62,6 +62,21 @@ export interface MusicField extends BaseField {
   options: readonly TrackId[];
 }
 
+export interface ChoiceOption {
+  /** Stored value — stable, never rename once customers have data. */
+  id: string;
+  label: string;
+  /** Short explanation shown under the label in the editor. */
+  hint?: string;
+}
+
+/** A small look-and-feel switch defined by the template itself (e.g. black & white photos). */
+export interface ChoiceField extends BaseField {
+  type: "choice";
+  options: readonly ChoiceOption[];
+  default: string;
+}
+
 export type FieldDef =
   | TextField
   | TextareaField
@@ -69,7 +84,8 @@ export type FieldDef =
   | DateField
   | ColorField
   | FontField
-  | MusicField;
+  | MusicField
+  | ChoiceField;
 
 export interface TemplateDefinition<F extends readonly FieldDef[] = readonly FieldDef[]> {
   /** URL-safe id; also the renderer registry key. */
@@ -125,6 +141,6 @@ export function defineTemplate<const F extends readonly FieldDef[]>(
   return def;
 }
 
-export function isStyleField(field: FieldDef): field is ColorField | FontField | MusicField {
+export function isStyleField(field: FieldDef): field is ColorField | FontField | MusicField | ChoiceField {
   return (STYLE_FIELD_TYPES as readonly string[]).includes(field.type);
 }
