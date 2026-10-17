@@ -69,6 +69,7 @@ src/
     our-story/                 definition.ts + OurStoryRenderer.tsx + CSS
     letter-for-you/            A Letter for You (envelope, letter, 10–12 photos)
     loveflix/                  Loveflix (streaming-style intro, profiles, title page, memory viewer)
+    journal/                   Journal (fan of photo pages, hardcover page turn, framed extras, words)
   components/
     editor/                    GenericEditor + FieldControl (schema-driven, template-agnostic)
     studio/                    customer flow: edit → preview → pay → finalize / failed / scheduled / live

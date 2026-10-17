@@ -82,6 +82,18 @@ export function GenericEditor({
               // A memory. Wider screens: photo with its date underneath on the left, "what happened"
               // on the right, both starting with a one-line label so the boxes line up.
               // Phones: photo and date side by side, the text full width below.
+              // Photos in a row without text (e.g. a page's extra photos): tiles side by side.
+              if (row.length > 1 && row.every((f) => f.type === "image")) {
+                return (
+                  <div key={row[0]!.id} className="flex flex-wrap gap-4">
+                    {row.map((f) => (
+                      <div key={f.id} className="w-28">
+                        {tile(f)}
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
               if (row.length > 1) {
                 const [photo, text, date] = row as [FieldDef, FieldDef, FieldDef | undefined];
                 // "First memory — what happened" → heading "First memory", label "What happened",
@@ -131,16 +143,22 @@ export function GenericEditor({
 
 /**
  * Groups a photo with the textarea right after it (and a date right after that, if any)
- * into one "memory" row; everything else is a row of one.
+ * into one "memory" row; consecutive photos without text into one row of tiles;
+ * everything else is a row of one.
  */
 function rows(fields: FieldDef[]): FieldDef[][] {
   const out: FieldDef[][] = [];
+  const startsMemory = (i: number) => fields[i]?.type === "image" && fields[i + 1]?.type === "textarea";
   for (let i = 0; i < fields.length; i++) {
     const f = fields[i]!;
-    if (f.type === "image" && fields[i + 1]?.type === "textarea") {
+    if (startsMemory(i)) {
       const withDate = fields[i + 2]?.type === "date";
       out.push(fields.slice(i, i + (withDate ? 3 : 2)));
       i += withDate ? 2 : 1;
+    } else if (f.type === "image") {
+      const run: FieldDef[] = [f];
+      while (fields[i + 1]?.type === "image" && !startsMemory(i + 1)) run.push(fields[++i]!);
+      out.push(run);
     } else out.push([f]);
   }
   return out;

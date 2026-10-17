@@ -144,9 +144,14 @@ export function FieldControl(props: FieldControlProps) {
             value: opt.id,
             label: opt.hint ? `${opt.label} — ${opt.hint}` : opt.label,
             render: (
-              <span className="block min-w-0 text-left">
-                <span className="block truncate text-sm font-medium text-ink">{opt.label}</span>
-                {opt.hint && <span className="mt-0.5 block text-[11px] leading-tight text-ink-soft">{opt.hint}</span>}
+              <span className="flex min-w-0 items-center gap-3 text-left">
+                {opt.swatch && (
+                  <span className="h-6 w-6 shrink-0 rounded-full ring-1 ring-black/15" style={{ background: opt.swatch }} aria-hidden />
+                )}
+                <span className="block min-w-0">
+                  <span className="block truncate text-sm font-medium text-ink">{opt.label}</span>
+                  {opt.hint && <span className="mt-0.5 block text-[11px] leading-tight text-ink-soft">{opt.hint}</span>}
+                </span>
               </span>
             ),
           }))}

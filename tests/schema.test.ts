@@ -136,3 +136,35 @@ describe("choice fields (Loveflix photo mode)", () => {
     expect(r.errors).toEqual({});
   });
 });
+
+describe("Journal template", () => {
+  const jt = TEMPLATES.journal as TemplateDefinition;
+  const jtImages = new Set(jt.fields.filter((f) => f.type === "image").map((f) => f.id));
+
+  it("requires only the first four page photos", () => {
+    const r = validateCustomerData(jt, { content: {}, style: {} }, { mode: "strict", imageFieldsPresent: noImages });
+    expect(Object.keys(r.errors).sort()).toEqual(["page_photo_1", "page_photo_2", "page_photo_3", "page_photo_4"]);
+  });
+
+  it("words colors default to white and accept only the curated colors", () => {
+    const r = validateCustomerData(jt, { style: { page_words_color_2: "navy", page_words_color_3: "#ff00ff" } }, { mode: "draft", imageFieldsPresent: noImages });
+    expect(r.data.style.page_words_color_1).toBe("white");
+    expect(r.data.style.page_words_color_2).toBe("navy");
+    expect(r.errors.page_words_color_3).toBeDefined();
+  });
+
+  it("the sample passes strict validation", () => {
+    const content: Record<string, string> = {};
+    for (const [k, v] of Object.entries(jt.sample)) if (!jtImages.has(k)) content[k] = v;
+    const r = validateCustomerData(jt, { content, style: jt.sample }, { mode: "strict", imageFieldsPresent: jtImages });
+    expect(r.errors).toEqual({});
+  });
+});
+
+describe("Journal pages", () => {
+  const jt = TEMPLATES.journal as TemplateDefinition;
+
+  it("offers twelve pages", () => {
+    expect(jt.fields.filter((f) => f.id.startsWith("page_photo_"))).toHaveLength(12);
+  });
+});

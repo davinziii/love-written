@@ -109,7 +109,7 @@ Available field types (`src/templates/types.ts`):
 | `color` | theme dropdown | `options` (theme ids), `default` | `style` |
 | `font` | font dropdown, each option shown in its font | `options` (font ids), `default`, `previewText` | `style` |
 | `music` | track picker (hidden while the library is empty) | `options` (track ids) | `style` |
-| `choice` | dropdown of the template's own options | `options` (`{ id, label, hint? }`), `default` | `style` |
+| `choice` | dropdown of the template's own options | `options` (`{ id, label, hint?, swatch? }`), `default` | `style` |
 
 Themes, fonts and music tracks are curated in `src/templates/styles.ts`.
 
@@ -151,7 +151,8 @@ Validation is generic too (`src/templates/schema.ts`):
 
 **Photos.** Every image field is shown as a compact tile (tap to upload, drop, or paste a
 copied photo). A group made only of image fields becomes a grid of tiles; an image field
-followed directly by a textarea (e.g. a memory photo + "what happened") is shown side by side.
+followed directly by a textarea (e.g. a memory photo + "what happened") is shown side by side,
+and photos that follow each other inside a mixed group (e.g. a page's extra photos) sit side by side as tiles.
 
 **Editor conventions (every template).** Keep these identical so customers always see the
 same thing:

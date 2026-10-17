@@ -68,6 +68,8 @@ export interface ChoiceOption {
   label: string;
   /** Short explanation shown under the label in the editor. */
   hint?: string;
+  /** A CSS color shown as a dot beside the label (for color choices). */
+  swatch?: string;
 }
 
 /** A small look-and-feel switch defined by the template itself (e.g. black & white photos). */
