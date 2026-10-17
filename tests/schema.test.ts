@@ -168,3 +168,14 @@ describe("Journal pages", () => {
     expect(jt.fields.filter((f) => f.id.startsWith("page_photo_"))).toHaveLength(12);
   });
 });
+
+describe("bulk photo pickers", () => {
+  for (const def of Object.values(TEMPLATES as Record<string, TemplateDefinition>)) {
+    if (!def.bulkPhotos) continue;
+    it(`${def.id}: every bulk photo id is an image field`, () => {
+      const images = new Set(def.fields.filter((f) => f.type === "image").map((f) => f.id));
+      expect(def.bulkPhotos!.fieldIds.length).toBeGreaterThan(0);
+      for (const id of def.bulkPhotos!.fieldIds) expect(images.has(id), id).toBe(true);
+    });
+  }
+});

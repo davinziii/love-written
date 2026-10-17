@@ -65,7 +65,7 @@ export function CustomizeStep({
           images={studio.images}
           errors={studio.errors}
           onFieldChange={studio.setField}
-          onImageSelect={(f, file) => void studio.uploadImage(f, file)}
+          onImageSelect={(f, file) => studio.uploadImage(f, file)}
           onImageRemove={(f) => void studio.removeImage(f)}
         />
         {missing.length > 0 && (

@@ -85,6 +85,11 @@ export const journalDefinition = defineTemplate({
   schemaVersion: 1,
   listed: true,
   displayField: "journal_title",
+  bulkPhotos: {
+    label: "Add all your page photos at once",
+    help: "Choose up to 12 photos in one go — they become pages 1, 2, 3… in order. You can replace any of them below.",
+    fieldIds: Array.from({ length: PAGE_COUNT }, (_, i) => `page_photo_${i + 1}`),
+  },
   highlights: [
     "Pages that turn like a real hardcover book",
     "4 to 12 pages, each a full photo",

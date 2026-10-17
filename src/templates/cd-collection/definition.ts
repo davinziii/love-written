@@ -60,6 +60,11 @@ export const cdCollectionDefinition = defineTemplate({
   schemaVersion: 1,
   listed: true,
   displayField: "collection_title",
+  bulkPhotos: {
+    label: "Add all your CD covers at once",
+    help: `Choose ${MIN_CDS} to ${MAX_CDS} photos in one go — each becomes a CD, in order. You can replace any of them below.`,
+    fieldIds: Array.from({ length: MAX_CDS }, (_, i) => `cd_photo_${i + 1}`),
+  },
   highlights: [
     `${MIN_CDS} to ${MAX_CDS} CDs, each with your photo as the cover`,
     "Hover or tap a CD to pull it out of the row",

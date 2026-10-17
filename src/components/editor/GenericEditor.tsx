@@ -1,11 +1,13 @@
 "use client";
 
+import { Fragment } from "react";
 import type { TemplateDefinition, FieldDef } from "@/templates/types";
 import { isStyleField } from "@/templates/types";
 import type { CustomerData } from "@/templates/schema";
 import { FieldControl, isFieldVisible, type FieldControlProps } from "./FieldControl";
 import type { ImageState } from "./ImageFieldControl";
 import { PhotoGrid, PhotoTile } from "./PhotoGrid";
+import { BulkPhotoPicker } from "./BulkPhotoPicker";
 
 /**
  * The generic, schema-driven editor. It reads `template.fields`, groups them by
@@ -28,15 +30,30 @@ export function GenericEditor({
   errors: Record<string, string>;
   disabled?: boolean;
   onFieldChange: (field: FieldDef, value: string) => void;
-  onImageSelect: (field: FieldDef, file: File) => void;
+  onImageSelect: (field: FieldDef, file: File) => void | Promise<void>;
   onImageRemove: (field: FieldDef) => void;
 }) {
   const groups = groupFields(template.fields.filter(isFieldVisible));
+  const bulk = template.bulkPhotos;
+  const bulkFields = bulk ? bulk.fieldIds.flatMap((id) => template.fields.filter((f) => f.id === id)) : [];
+  // The bulk picker sits right above the group holding the first of its photos.
+  const bulkGroup = bulkFields[0]?.group;
 
   return (
     <div className="space-y-6">
       {groups.map(([group, fields]) => (
-        <section key={group} className="rounded-[1.75rem] bg-paper p-5 ring-1 ring-line sm:p-7" aria-labelledby={`group-${slug(group)}`}>
+        <Fragment key={group}>
+        {bulk && group === bulkGroup && (
+          <BulkPhotoPicker
+            label={bulk.label}
+            help={bulk.help}
+            fields={bulkFields}
+            images={images}
+            disabled={disabled}
+            onSelect={onImageSelect}
+          />
+        )}
+        <section className="rounded-[1.75rem] bg-paper p-5 ring-1 ring-line sm:p-7" aria-labelledby={`group-${slug(group)}`}>
           <h2 id={`group-${slug(group)}`} className="font-display text-xl">
             {group}
           </h2>
@@ -136,6 +153,7 @@ export function GenericEditor({
           </div>
           )}
         </section>
+        </Fragment>
       ))}
     </div>
   );

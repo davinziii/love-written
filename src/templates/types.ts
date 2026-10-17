@@ -109,6 +109,11 @@ export interface TemplateDefinition<F extends readonly FieldDef[] = readonly Fie
   fields: F;
   /** Example data used for catalog previews. Image values are public URLs here. */
   sample: Record<string, string>;
+  /**
+   * Templates with many photos: one "add all your photos at once" picker that fills these
+   * image fields in order. Shown in the editor right above the first of them.
+   */
+  bulkPhotos?: { label: string; help?: string; fieldIds: readonly string[] };
 }
 
 /* ─── Type inference: field list → typed renderer data ─────────────────────── */
