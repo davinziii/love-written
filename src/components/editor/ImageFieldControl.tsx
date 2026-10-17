@@ -75,15 +75,26 @@ export function ImageFieldControl({
             >
               {busy ? "Uploading…" : "Replace"}
             </button>
-            {!required && (
+            {busy ? (
+              // A damaged file could otherwise spin forever: any upload can be cancelled.
               <button
                 type="button"
-                disabled={disabled || busy}
                 onClick={onRemove}
-                className="rounded-full px-4 py-2 text-sm text-ink-soft hover:text-danger disabled:opacity-50"
+                className="rounded-full px-4 py-2 text-sm text-ink-soft hover:text-danger"
               >
-                Remove
+                Cancel
               </button>
+            ) : (
+              !required && (
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={onRemove}
+                  className="rounded-full px-4 py-2 text-sm text-ink-soft hover:text-danger disabled:opacity-50"
+                >
+                  Remove
+                </button>
+              )
             )}
           </div>
         </div>

@@ -239,12 +239,14 @@ export function PhotoTile({
             </span>
           )}
         </button>
-        {!field.required && state?.url && !busy && (
+        {/* While uploading, any photo can be cancelled (a damaged file could otherwise spin forever). */}
+        {(busy || (!field.required && state?.url)) && (
           <button
             type="button"
-            disabled={disabled}
+            disabled={disabled && !busy}
             onClick={onRemove}
-            aria-label={`Remove ${field.label}`}
+            aria-label={busy ? `Cancel uploading ${field.label}` : `Remove ${field.label}`}
+            title={busy ? "Cancel upload" : undefined}
             className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-white text-ink-soft shadow ring-1 ring-line hover:text-danger"
           >
             <Icon.close size={12} />

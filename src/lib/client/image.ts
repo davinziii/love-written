@@ -40,7 +40,37 @@ async function decodeHeic(file: File): Promise<ImageBitmap> {
   }
 }
 
-export async function prepareImage(file: File): Promise<Blob> {
+/**
+ * A damaged file can make the browser's decoder (or the HEIC converter) never answer at all,
+ * which would leave the photo "uploading" forever. Give up after this long.
+ */
+const PREPARE_TIMEOUT_MS = 30_000;
+
+/**
+ * Prepare a photo for upload. Rejects with an `ImagePrepError` the customer can read, or with
+ * an `AbortError` when `signal` is aborted (the customer cancelled).
+ */
+export function prepareImage(file: File, signal?: AbortSignal): Promise<Blob> {
+  return new Promise<Blob>((resolve, reject) => {
+    if (signal?.aborted) return reject(new DOMException("Aborted", "AbortError"));
+    const timer = setTimeout(
+      () => reject(new ImagePrepError("That photo is taking too long to read — it may be damaged. Please choose a different one.")),
+      PREPARE_TIMEOUT_MS,
+    );
+    const onAbort = () => reject(new DOMException("Aborted", "AbortError"));
+    signal?.addEventListener("abort", onAbort, { once: true });
+    // If the decoder never answers, this promise simply never settles; the timer or the
+    // abort above has already rejected, so the customer isn't left waiting.
+    prepare(file)
+      .then(resolve, reject)
+      .finally(() => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+      });
+  });
+}
+
+async function prepare(file: File): Promise<Blob> {
   const heic = await isHeic(file);
   if (!heic && file.type && !(UPLOAD_RULES.acceptedMime as readonly string[]).includes(file.type)) {
     throw new ImagePrepError("Please choose a JPG, PNG, WebP or HEIC photo.");

@@ -180,37 +180,77 @@ export function useStudio(surpriseId: string) {
     [markDirty],
   );
 
+  /** Uploads in progress, per field — so one can be cancelled, and a stale one can't win. */
+  const inFlight = useRef(
+    new Map<string, { ctrl: AbortController; previousUrl: string | undefined; preview: string; sending: boolean }>(),
+  );
+
+  /** Stop an upload in progress and put back the photo that was there before. */
+  const cancelUpload = useCallback(
+    (field: FieldDef) => {
+      const job = inFlight.current.get(field.id);
+      if (!job) return;
+      inFlight.current.delete(field.id);
+      job.ctrl.abort();
+      URL.revokeObjectURL(job.preview);
+      setImages((p) => {
+        if (job.previousUrl) return { ...p, [field.id]: { url: job.previousUrl } };
+        const { [field.id]: _removed, ...rest } = p;
+        return rest;
+      });
+      // If the photo had already reached us, the server may still finish saving it.
+      // Re-read shortly so the editor shows whatever is really stored.
+      if (job.sending) setTimeout(() => void refresh().catch(() => undefined), 2500);
+    },
+    [refresh],
+  );
+
   const uploadImage = useCallback(
     async (field: FieldDef, file: File) => {
       if (!token.current) return;
-      const previous = images[field.id];
+      const earlier = inFlight.current.get(field.id);
+      if (earlier) {
+        earlier.ctrl.abort();
+        URL.revokeObjectURL(earlier.preview);
+      }
+      const previousUrl = earlier ? earlier.previousUrl : images[field.id]?.url;
       const preview = URL.createObjectURL(file);
+      const job = { ctrl: new AbortController(), previousUrl, preview, sending: false };
+      inFlight.current.set(field.id, job);
+      const current = () => inFlight.current.get(field.id) === job;
       setImages((p) => ({ ...p, [field.id]: { url: preview, uploading: true } }));
       try {
-        const blob = await prepareImage(file);
+        const blob = await prepareImage(file, job.ctrl.signal);
         const form = new FormData();
         form.append("fieldId", field.id);
         form.append("file", blob, "photo");
+        job.sending = true;
         // Replacing a field's photo is safe to repeat, so retry if the connection drops.
         const res = await api<{ url: string | null }>(`/api/surprises/${surpriseId}/media`, {
           method: "POST",
           editToken: token.current,
           body: form,
           retries: 2,
+          signal: job.ctrl.signal,
         });
+        if (!current()) return;
+        inFlight.current.delete(field.id);
         setImages((p) => ({ ...p, [field.id]: { url: res.url ?? preview } }));
         setErrors((prev) => {
           const { [field.id]: _removed, ...rest } = prev;
           return rest;
         });
       } catch (err) {
+        // Cancelled, or replaced by a newer photo: that one owns the field now.
+        if (!current()) return;
+        inFlight.current.delete(field.id);
         const message =
           err instanceof ClientApiError && err.code === "NETWORK"
             ? "The upload was interrupted. Tap the photo to try again."
             : err instanceof ImagePrepError || err instanceof ClientApiError
               ? err.message
               : "We couldn't upload that photo. Please try again.";
-        setImages((p) => ({ ...p, [field.id]: { url: previous?.url, error: message } }));
+        setImages((p) => ({ ...p, [field.id]: { url: previousUrl, error: message } }));
         URL.revokeObjectURL(preview);
       }
     },
@@ -220,6 +260,11 @@ export function useStudio(surpriseId: string) {
   const removeImage = useCallback(
     async (field: FieldDef) => {
       if (!token.current) return;
+      // Removing a photo that is still uploading just cancels the upload.
+      if (inFlight.current.has(field.id)) {
+        cancelUpload(field);
+        return;
+      }
       const previous = images[field.id];
       setImages((p) => ({ ...p, [field.id]: { uploading: true, url: previous?.url } }));
       try {
@@ -239,7 +284,7 @@ export function useStudio(surpriseId: string) {
         }));
       }
     },
-    [images, surpriseId],
+    [images, surpriseId, cancelUpload],
   );
 
   // Save before the tab closes, if possible.
