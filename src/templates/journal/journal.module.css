@@ -45,12 +45,7 @@
   display: flex;
   gap: 8px;
 }
-.headerRight {
-  grid-area: right;
-  justify-content: flex-end;
-}
-.round,
-.roundGhost {
+.round {
   display: grid;
   place-items: center;
   width: 34px;
@@ -68,9 +63,6 @@
 .roundActive {
   border-color: #fff;
   background: transparent;
-}
-.roundGhost {
-  opacity: 0.85;
 }
 @media (hover: hover) {
   .round:not(.roundActive):hover {

@@ -216,14 +216,6 @@ export function JournalRenderer({ data, mode }: RendererProps<JournalData>) {
             <PenIcon /> {count} {count === 1 ? "Page" : "Pages"}
           </p>
         </div>
-        <div className={`${s.headerSide} ${s.headerRight}`} aria-hidden>
-          <span className={s.roundGhost}>
-            <SearchIcon />
-          </span>
-          <span className={s.roundGhost}>
-            <MenuIcon />
-          </span>
-        </div>
       </header>
 
       {view === "book" ? (
@@ -442,21 +434,6 @@ function GridIcon() {
   return (
     <svg {...icon}>
       <path d="M5 5h5v5H5zM14 5h5v5h-5zM5 14h5v5H5zM14 14h5v5h-5z" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinejoin="round" />
-    </svg>
-  );
-}
-function SearchIcon() {
-  return (
-    <svg {...icon}>
-      <circle cx="10.5" cy="10.5" r="5.5" stroke="currentColor" strokeWidth="2" fill="none" />
-      <path d="M15 15l4.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-function MenuIcon() {
-  return (
-    <svg {...icon}>
-      <path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
