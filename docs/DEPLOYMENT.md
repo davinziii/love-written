@@ -127,7 +127,7 @@ See [CLOUDFLARE.md](CLOUDFLARE.md).
 - [ ] `surprise-media` bucket is **private**
 - [ ] Admin user exists, sign-ups disabled, row in `admin_users`
 - [ ] `PAYMONGO_MODE=live` with the live webhook secret
-- [ ] One real ₱199 purchase end-to-end in live mode, published and opened on a phone
+- [ ] One real ₱99 purchase end-to-end in live mode, published and opened on a phone
 - [ ] `LW_FAULT_INJECT_PUBLISH` unset
 - [ ] Turnstile keys set (optional but recommended)
 - [ ] Cron responding: call `/api/cron/maintenance` with the bearer token and check the JSON summary

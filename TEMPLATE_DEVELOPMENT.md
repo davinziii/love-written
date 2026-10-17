@@ -126,9 +126,9 @@ ourStoryDefinition.fields → [{ id: "final_message", required: true, ... }, ...
 // The customer's surprise says: "final_message = I love you."
 surprises row → {
   template_id: "our-story",
-  schema_version: 1,
+  schema_version: 2,
   content: { recipient_name: "Samantha", final_message: "I love you.", ... },   // words, dates
-  style:   { theme: "blush", font: "classic", music: "none" },              // look & feel
+  style:   { theme: "blush", story_font: "lora", final_font: "great_vibes" },  // look & feel
 }
 media rows   → { field_id: "memory_photo_1", storage_path: "surprises/<id>/<uuid>.webp" }
 ```
@@ -191,7 +191,8 @@ type OurStoryData = {
   memory_1: string;
   final_message: string;
   theme: string;              // style fields always have a value (defaults)
-  font: string;
+  story_font: string;
+  final_font: string;
   music: string;
   memory_photo_2?: string;    // optional → may be undefined
   memory_2?: string;
@@ -241,7 +242,7 @@ Create `src/templates/birthday-surprise/definition.ts`:
 
 ```ts
 import { defineTemplate, type TemplateData } from "../types";
-import { FINAL_FONT_IDS, STORY_FONT_IDS } from "../styles";
+import { FINAL_FONT_IDS, STORY_FONT_IDS, THEME_IDS } from "../styles";
 
 export const birthdaySurpriseDefinition = defineTemplate({
   id: "birthday-surprise",

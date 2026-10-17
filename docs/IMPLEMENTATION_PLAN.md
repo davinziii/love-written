@@ -47,7 +47,7 @@ TEMPLATE_DEVELOPMENT.md              How to add template #2
 |---|---|
 | `surprises` | Customer project: template id, content, style, lifecycle `stage`, separate `payment_status`, tokens (hashed), reveal timing, lock/publish/expiry timestamps |
 | `media` | One optimized image per (surprise, image field); storage path + metadata |
-| `orders` | One purchase attempt: order number, amount (server constant ₱199), PayMongo checkout session |
+| `orders` | One purchase attempt: order number, amount (server-side `PRICE_CENTAVOS`, default ₱99), PayMongo checkout session |
 | `payments` | Verified PayMongo payments (unique provider payment id) |
 | `payment_events` | Webhook inbox — unique provider event id ⇒ idempotent processing |
 | `publish_operations` | Every publish/schedule/activation attempt (idempotency key, status, error) |
