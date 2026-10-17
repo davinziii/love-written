@@ -1,0 +1,491 @@
+/* CD Collection — trusted template styles.
+   Every face is a plain element sized in jewel-case millimetres (front 142 × 125, side
+   10 × 125, top 142 × 10) and placed with a 2D matrix() from geometry.ts, so the inside of a
+   face is laid out in real case proportions. Only transform/opacity animate. */
+
+.root {
+  --screen-h: var(--lw-screen-h, 100svh);
+  --ink: #2a2a2c;
+  --ink-soft: rgb(42 42 44 / 0.6);
+  --slide: 0.34s cubic-bezier(0.2, 0.8, 0.2, 1);
+  position: relative;
+  min-height: var(--screen-h);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-inter), "Helvetica Neue", Arial, sans-serif;
+  container-type: inline-size;
+  overflow-x: clip;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
+}
+.root[data-tone="dark"] {
+  --ink: #ececee;
+  --ink-soft: rgb(236 236 238 / 0.6);
+}
+.root button {
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Title and hint (top-left, out of the collection's way) ─────────────── */
+
+.header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  padding: 18px 20px;
+  pointer-events: none;
+}
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.hintHover {
+  display: none;
+}
+@media (hover: hover) {
+  .hintHover {
+    display: inline;
+  }
+  .hintTouch {
+    display: none;
+  }
+}
+
+/* ── The stage ──────────────────────────────────────────────────────────── */
+
+.stage {
+  position: relative;
+  height: var(--screen-h);
+  overflow: hidden;
+  touch-action: manipulation;
+  user-select: none;
+}
+/* Too many CDs to show legibly: the collection scrolls instead of shrinking further. */
+.stage[data-pan] {
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.drawing {
+  position: relative;
+}
+.shadows {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Every face: placed by its matrix from the top-left corner of the drawing. */
+.hit,
+.top,
+.side,
+.front,
+.shadow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+.shadow {
+  background: linear-gradient(rgb(0 0 0 / 0.2), rgb(0 0 0 / 0.06) 55%, transparent);
+  opacity: 0.75;
+  transition:
+    transform var(--slide),
+    opacity var(--slide);
+}
+.shadow[data-active] {
+  opacity: 1;
+}
+.root[data-tone="dark"] .shadow {
+  background: linear-gradient(rgb(0 0 0 / 0.5), rgb(0 0 0 / 0.15) 55%, transparent);
+}
+
+/* One case. The wrapper only groups; its hit areas and (when pulled out) its faces take the pointer. */
+.cd {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.hit {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.hit:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+.body {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transition: transform var(--slide);
+}
+.cd[data-active] .body > * {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* Clear plastic: the front, a thin side edge and the top edge. */
+.front {
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.6);
+  border-radius: 1.5px;
+  background: rgb(232 235 240 / 0.45);
+  box-shadow:
+    inset 0 0 0 1px rgb(120 126 136 / 0.25),
+    0 1px 2px rgb(0 0 0 / 0.12);
+}
+/* The hinge strip on the left of a jewel case, with its little ridges. */
+.hinge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 9%;
+  background:
+    repeating-linear-gradient(0deg, rgb(0 0 0 / 0.07) 0 1.5px, transparent 1.5px 5px),
+    linear-gradient(90deg, rgb(196 201 209 / 0.9), rgb(242 244 247 / 0.8) 45%, rgb(180 186 195 / 0.9));
+}
+/* The cover sits just inside the plastic. */
+.art {
+  position: absolute;
+  top: 3.6%;
+  left: 12%;
+  width: 82.5%;
+  height: 92.8%;
+  overflow: hidden;
+  background: #cfcfd2;
+  box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.18);
+}
+.art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 40%;
+}
+/* Soft light across the plastic. */
+.gloss {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    118deg,
+    rgb(255 255 255 / 0.36) 0%,
+    rgb(255 255 255 / 0.08) 26%,
+    transparent 44%,
+    transparent 72%,
+    rgb(255 255 255 / 0.14) 100%
+  );
+}
+.side {
+  background: linear-gradient(90deg, rgb(176 182 190 / 0.96), rgb(218 222 228 / 0.92) 55%, rgb(158 164 172 / 0.96));
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.5);
+}
+.top {
+  background: linear-gradient(rgb(246 247 249 / 0.97), rgb(208 212 219 / 0.97));
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.6);
+}
+
+.placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(135deg, #e2e2e5 0 8px, #d4d4d8 8px 16px);
+}
+
+/* ── Controls ───────────────────────────────────────────────────────────── */
+
+.controls {
+  position: absolute;
+  top: calc(var(--screen-h) - 74px);
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transform: translateX(-50%);
+}
+.control,
+.openButton {
+  height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.88);
+  color: #2a2a2c;
+  box-shadow: 0 3px 12px rgb(0 0 0 / 0.14);
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
+}
+.control {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  padding: 0;
+}
+.control svg {
+  width: 18px;
+  height: 18px;
+}
+.openButton {
+  min-width: 96px;
+  padding: 0 18px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.openButton:disabled {
+  cursor: default;
+  color: rgb(42 42 44 / 0.6);
+}
+.control:active,
+.openButton:active:not(:disabled) {
+  transform: scale(0.95);
+}
+.control:focus-visible,
+.openButton:focus-visible,
+.viewerClose:focus-visible,
+.viewerNav:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.footer {
+  padding: 24px 16px 26px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.footer p {
+  margin: 0;
+}
+.footer p + p {
+  margin-top: 0.4rem;
+}
+.footer a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ── Memory viewer ──────────────────────────────────────────────────────── */
+
+.viewerLayer {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: 0;
+}
+.viewer {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: var(--screen-h);
+  background: rgb(226 226 228 / 0.97);
+  color: #232325;
+  animation: fadeIn 0.25s ease both;
+}
+.root[data-tone="dark"] .viewer {
+  background: rgb(22 23 27 / 0.97);
+  color: #ececee;
+}
+.viewer[data-closing] {
+  animation: fadeOut 0.2s ease forwards;
+}
+.viewerBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(10px + env(safe-area-inset-top)) 18px 4px 12px;
+}
+.viewerClose,
+.viewerNav {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.07);
+  color: inherit;
+  cursor: pointer;
+}
+.root[data-tone="dark"] .viewerClose,
+.root[data-tone="dark"] .viewerNav {
+  background: rgb(255 255 255 / 0.1);
+}
+.viewerClose svg,
+.viewerNav svg {
+  width: 22px;
+  height: 22px;
+}
+.viewerCount {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+}
+.viewerBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.viewerStage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 140px;
+  touch-action: pan-y;
+  user-select: none;
+}
+.viewerPhoto,
+.viewerPlaceholder {
+  position: absolute;
+  inset: 6px 14px;
+  width: calc(100% - 28px);
+  height: calc(100% - 12px);
+}
+.viewerPhoto {
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.viewerPhoto[data-loaded] {
+  opacity: 1;
+}
+.viewerPlaceholder {
+  background: repeating-linear-gradient(135deg, #e2e2e5 0 10px, #d4d4d8 10px 20px);
+}
+.viewerNav {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  background: rgb(255 255 255 / 0.75);
+  transform: translateY(-50%);
+}
+.viewerPrev {
+  left: 10px;
+}
+.viewerNext {
+  right: 10px;
+}
+.viewerText {
+  flex: none;
+  width: 100%;
+  max-width: 640px;
+  max-height: 42%;
+  margin: 0 auto;
+  padding: 12px 22px calc(24px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  animation: fadeIn 0.35s 0.05s ease both;
+}
+.viewerTrack {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+.viewerTitle {
+  margin: 4px 0 8px;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.viewerMessage {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.6;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  opacity: 0.85;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+  }
+}
+
+/* ── Wider screens ──────────────────────────────────────────────────────── */
+
+@container (min-width: 600px) {
+  .header {
+    padding: 24px 32px;
+  }
+  .title {
+    font-size: 20px;
+  }
+}
+@container (min-width: 900px) {
+  .viewerBody {
+    flex-direction: row;
+    align-items: center;
+  }
+  .viewerStage {
+    flex: 1.5 1 0;
+    align-self: stretch;
+  }
+  .viewerPhoto {
+    inset: 10px 30px 40px 40px;
+    width: calc(100% - 70px);
+    height: calc(100% - 50px);
+  }
+  .viewerText {
+    flex: 1 1 0;
+    max-width: 440px;
+    max-height: 100%;
+    padding: 0 48px 40px 16px;
+  }
+  .viewerTitle {
+    font-size: 30px;
+  }
+  .viewerMessage {
+    font-size: 17px;
+  }
+}
+
+/* ── Reduced motion: cases simply appear in place ───────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .body,
+  .shadow,
+  .control,
+  .openButton {
+    transition: none;
+  }
+  .viewerText {
+    animation: none;
+  }
+}
