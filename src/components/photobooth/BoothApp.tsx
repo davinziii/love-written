@@ -97,6 +97,11 @@ export function BoothApp({ sessionId, justPaid, cancelled }: { sessionId: string
   const partnerName = state.partner.name ?? "Your person";
   const wide = isWide(state);
   const canLeave = status === "PAID" || status === "IN_PROGRESS" || status === "DESIGNING";
+  // The live strip preview: hidden once done, and while choosing the look (that screen shows
+  // its own big preview). Wide frames go in a full-width row above, tall ones in the side column.
+  const preview = status === "COMPLETED" || status === "DESIGNING" ? null : <LivePreview state={state} cameraFilter={cameraFilter} />;
+  const shape = previewFrame(state);
+  const wideStrip = shape.width > shape.height;
 
   return (
     <Shell onLeave={canLeave ? leave : undefined} offline={booth.offline} wide={wide}>
@@ -104,7 +109,8 @@ export function BoothApp({ sessionId, justPaid, cancelled }: { sessionId: string
       {liveStage && idle.state !== "active" && <AwayPrompt state={idle.state} onHere={idle.resume} />}
       {wide ? (
         <Stage
-          left={status === "COMPLETED" ? null : <LivePreview state={state} cameraFilter={cameraFilter} />}
+          top={wideStrip ? preview : null}
+          left={wideStrip ? null : preview}
           main={<Screen {...props} />}
           right={
             solo ? null : (
@@ -205,37 +211,50 @@ function Screen(props: ScreenProps) {
  * Desktop: preview | main | chat. Phones: main first, then preview + chat side by side.
  * Without chat (solo): preview | main on desktop; on phones the preview sits under main.
  */
-function Stage({ left, main, right }: { left: ReactNode; main: ReactNode; right: ReactNode }) {
+function Stage({ top, left, main, right }: { top?: ReactNode; left: ReactNode; main: ReactNode; right: ReactNode }) {
+  // A wide (landscape) strip preview gets its own full-width row; a tall one sits in the side column.
+  const topRow = top ? <div className="mx-auto mb-4 w-full max-w-3xl">{top}</div> : null;
   if (!right) {
     return (
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,190px)_minmax(0,1fr)] lg:items-start">
-        <div className="min-w-0 lg:col-start-2 lg:row-start-1">{main}</div>
-        {left && <aside className="mx-auto w-28 min-w-0 sm:w-36 lg:sticky lg:top-4 lg:col-start-1 lg:row-start-1 lg:w-auto">{left}</aside>}
-      </div>
+      <>
+        {topRow}
+        <div className={`grid gap-5 lg:items-start ${left ? "lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)]" : ""}`}>
+          <div className={`min-w-0 ${left ? "lg:col-start-2 lg:row-start-1" : ""}`}>{main}</div>
+          {left && <aside className="mx-auto w-44 min-w-0 sm:w-56 lg:sticky lg:top-4 lg:col-start-1 lg:row-start-1 lg:w-auto">{left}</aside>}
+        </div>
+      </>
     );
   }
   return (
-    <div className={`grid gap-4 lg:items-start ${left ? "lg:grid-cols-[minmax(0,190px)_minmax(0,1fr)_minmax(0,320px)]" : "lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]"}`}>
-      <div className={`min-w-0 lg:row-start-1 ${left ? "lg:col-start-2" : "lg:col-start-1"}`}>{main}</div>
-      <div className={`grid gap-3 lg:contents ${left ? "grid-cols-[84px_minmax(0,1fr)] sm:grid-cols-[120px_minmax(0,1fr)]" : ""}`}>
-        {left && <aside className="min-w-0 lg:sticky lg:top-4 lg:col-start-1 lg:row-start-1">{left}</aside>}
-        <aside className={`h-[340px] min-w-0 lg:sticky lg:top-4 lg:row-start-1 lg:h-[min(640px,calc(100svh-7rem))] ${left ? "lg:col-start-3" : "lg:col-start-2"}`}>
-          {right}
-        </aside>
+    <>
+      {topRow}
+      <div className={`grid gap-4 lg:items-start ${left ? "lg:grid-cols-[minmax(0,250px)_minmax(0,1fr)_minmax(0,320px)]" : "lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]"}`}>
+        <div className={`min-w-0 lg:row-start-1 ${left ? "lg:col-start-2" : "lg:col-start-1"}`}>{main}</div>
+        <div className={`grid gap-3 lg:contents ${left ? "grid-cols-[120px_minmax(0,1fr)] sm:grid-cols-[170px_minmax(0,1fr)]" : ""}`}>
+          {left && <aside className="min-w-0 lg:sticky lg:top-4 lg:col-start-1 lg:row-start-1">{left}</aside>}
+          <aside className={`h-[400px] min-w-0 lg:sticky lg:top-4 lg:row-start-1 lg:h-[min(640px,calc(100svh-7rem))] ${left ? "lg:col-start-3" : "lg:col-start-2"}`}>
+            {right}
+          </aside>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
 /** The strip as it will look, filling in as photos are kept (and showing your pick while choosing). */
+/** The frame the strip preview shows: your pick, else the session's frame, else the default. */
+function previewFrame(state: BoothState) {
+  return getFrame(state.me.pick.frame ?? state.frameId) ?? getFrame(DEFAULT_FRAME_ID)!;
+}
+
 function LivePreview({ state, cameraFilter }: { state: BoothState; cameraFilter: StripFilter }) {
-  const frame = getFrame(state.me.pick.frame ?? state.frameId) ?? getFrame(DEFAULT_FRAME_ID)!;
+  const frame = previewFrame(state);
   const filter: StripFilter = state.me.pick.filter ?? state.finalFilter ?? cameraFilter;
   return (
     <div>
       <StripPreview frame={frame} approved={state.approved} filter={filter} solo={state.solo} />
-      <p className="mt-2 text-center text-[11px] leading-tight text-ink-soft">
-        Your strip · {state.approved.length}/4
+      <p className="mt-2 text-center text-xs leading-tight text-ink-soft">
+        Your strip · {state.approved.length}/{state.photoCount}
       </p>
     </div>
   );
@@ -780,12 +799,8 @@ function DesignStep({ booth, state, cameraFilter }: { booth: Booth; state: Booth
     statusLine = "Pick a filter and a frame. Your strip is made when you both choose the same look.";
   }
 
-  const Badge = ({ mine, theirs }: { mine: boolean; theirs: boolean }) => (
-    <span className="mt-1.5 flex min-h-5 flex-wrap justify-center gap-1">
-      {mine && <span className="rounded-full bg-rose px-2 py-0.5 text-[10px] font-medium text-white">You</span>}
-      {theirs && !solo && <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-medium text-cream">{partnerName} picks this</span>}
-    </span>
-  );
+  const wideStrip = frame.width > frame.height;
+  const theirFilter = !solo && partner.pick.filter ? FILTERS.find((f) => f.id === partner.pick.filter)?.label : null;
 
   return (
     <div className="space-y-4">
@@ -794,65 +809,83 @@ function DesignStep({ booth, state, cameraFilter }: { booth: Booth; state: Booth
         <h1 className="mt-1 font-display text-3xl">Make it yours</h1>
       </div>
 
-      <div className="mx-auto w-40 lg:hidden">
+      {/* The strip beside a narrow, portrait picker. A wide strip takes the larger side; on phones
+          a wide strip goes above the picker (side by side it would be too small to see). */}
+      <div
+        className={
+          wideStrip
+            ? "space-y-4 sm:grid sm:grid-cols-[minmax(0,1fr)_14rem] sm:items-center sm:gap-5 sm:space-y-0"
+            : "grid grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] items-start gap-3 sm:mx-auto sm:max-w-[34rem] sm:grid-cols-[minmax(0,1fr)_14rem] sm:gap-5"
+        }
+      >
+      {/* Never taller than ~70% of the screen, so the strip and the button fit together. */}
+      <div className="mx-auto w-full sm:sticky sm:top-4" style={{ maxWidth: `calc(70svh * ${frame.width} / ${frame.height})` }}>
         <StripPreview frame={frame} approved={state.approved} filter={filter} solo={solo} />
       </div>
 
-      <Card>
-        <h2 className="text-sm font-semibold">Filter</h2>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          {FILTERS.map((f) => {
-            const mine = f.id === filter;
-            return (
+      <Card className="space-y-4 !p-4 sm:!p-5">
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold">Filter</h2>
+          <div className="flex w-full rounded-full bg-white p-1 ring-1 ring-line" role="radiogroup" aria-label="Filter">
+            {FILTERS.map((f) => (
               <button
                 key={f.id}
                 type="button"
+                role="radio"
+                aria-checked={f.id === filter}
                 disabled={busy}
-                onClick={() => !mine && void pick({ filter: f.id })}
-                aria-pressed={mine}
-                className={`rounded-2xl bg-white p-3 text-center transition ${mine ? "ring-2 ring-rose" : "ring-1 ring-line hover:ring-ink/30"}`}
+                onClick={() => f.id !== filter && void pick({ filter: f.id })}
+                className={`flex-1 whitespace-nowrap rounded-full px-2 py-1.5 text-[11px] font-medium transition sm:text-xs ${f.id === filter ? "bg-ink text-cream" : "text-ink-soft hover:text-ink"}`}
               >
-                <span className={`mx-auto block h-14 w-full rounded-lg bg-[linear-gradient(135deg,#e85d84,#ffd36e,#6fb6e8)] ${f.id === "bw" ? "grayscale" : ""}`} />
-                <span className="mt-2 block text-sm font-medium">{f.label}</span>
-                <Badge mine={mine} theirs={partner.pick.filter === f.id} />
+                {f.id === "bw" ? "B&W" : f.label}
               </button>
-            );
-          })}
+            ))}
+          </div>
+          {theirFilter && <p className="text-[11px] text-ink-soft">{partnerName} picks {theirFilter.toLowerCase()}</p>}
         </div>
-      </Card>
 
-      <Card>
-        <h2 className="text-sm font-semibold">Frame</h2>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          {FRAMES.map((f) => {
-            const mine = f.id === frameId;
-            return (
-              <button
-                key={f.id}
-                type="button"
-                disabled={busy}
-                onClick={() => !mine && void pick({ frameId: f.id })}
-                aria-pressed={mine}
-                className={`rounded-2xl bg-white p-3 text-center transition ${mine ? "ring-2 ring-rose" : "ring-1 ring-line hover:ring-ink/30"}`}
-              >
-                <span className="mx-auto block h-14 max-w-full rounded-sm ring-1 ring-black/10" style={{ background: f.background, aspectRatio: `${f.width} / ${f.height}` }} />
-                <span className="mt-2 block text-sm font-medium">{f.name}</span>
-                <Badge mine={mine} theirs={partner.pick.frame === f.id} />
-              </button>
-            );
-          })}
+        <div className="border-t border-line pt-4">
+          <h2 className="text-sm font-semibold">Frame</h2>
+          <div className={`mt-3 grid gap-2 ${wideStrip ? "grid-cols-3 sm:grid-cols-2" : "grid-cols-2"}`} role="radiogroup" aria-label="Frame">
+            {FRAMES.map((f) => {
+              const mine = f.id === frameId;
+              const theirs = !solo && partner.pick.frame === f.id;
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={mine}
+                  disabled={busy}
+                  onClick={() => !mine && void pick({ frameId: f.id })}
+                  className={`relative min-w-0 rounded-xl bg-white p-1 text-center transition ${mine ? "ring-2 ring-rose" : "ring-1 ring-line hover:ring-ink/30"}`}
+                >
+                  <span className="grid h-16 place-items-center rounded-lg bg-soft">
+                    <img src={f.preview} alt="" className="max-h-14 max-w-[90%] rounded-[2px] object-contain shadow-sm" loading="lazy" />
+                  </span>
+                  <span className="mt-1 block truncate text-[10px] font-medium leading-tight sm:text-[11px]">{f.name}</span>
+                  {theirs && (
+                    <span className="absolute -right-1 -top-1 max-w-[4.5rem] truncate rounded-full bg-ink px-1.5 py-0.5 text-[9px] font-medium text-cream" title={`${partnerName} picks this`}>
+                      {partnerName}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </Card>
+      </div>
 
       <p className="text-center text-sm text-ink-soft" role="status">
         {statusLine}
       </p>
       {me.pick.confirmed ? (
-        <p className="rounded-full bg-white py-3 text-center text-sm font-medium ring-1 ring-line">
-          You chose {label(frameId, filter)} ✓ <span className="text-ink-soft">— change it above anytime</span>
+        <p className={`rounded-full bg-white py-3 text-center text-sm font-medium ring-1 ring-line ${wideStrip ? "" : "sm:mx-auto sm:max-w-[34rem]"}`}>
+          You chose {label(frameId, filter)} ✓ <span className="text-ink-soft">— you can still change it</span>
         </p>
       ) : (
-        <Button className="w-full py-4 text-base" busy={busy} onClick={() => void pick({}, true)}>
+        <Button className={`w-full py-4 text-base ${wideStrip ? "" : "sm:mx-auto sm:block sm:max-w-[34rem]"}`} busy={busy} onClick={() => void pick({}, true)}>
           {solo ? "Make my strip" : "Use this look"}
         </Button>
       )}
