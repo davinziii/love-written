@@ -13,16 +13,38 @@ import { PHOTOBOOTH_RETENTION_DAYS } from "@/lib/photobooth/constants";
 
 export const metadata: Metadata = {
   title: "Photobooth",
-  description: "A private digital photobooth for two. Take three photos together, even when you're apart.",
+  description: "A private digital photobooth for two — or just for you. Take three photos, even when you're apart.",
 };
 
 const STEPS = [
-  { icon: Icon.wallet, title: "Pay", body: "One session for two people." },
-  { icon: Icon.send, title: "Invite your person", body: "They get their own private link — and join free." },
-  { icon: Icon.monitor, title: "Open your cameras", body: "On your phones or laptops, wherever you both are." },
+  { icon: Icon.wallet, title: "Pay", body: "One session — for two people, or just you." },
+  { icon: Icon.send, title: "Invite your person", body: "They get their own private link — and join free. (Going solo? Skip this.)" },
+  { icon: Icon.monitor, title: "Open your cameras", body: "On your phones or laptops, wherever you both are — in color or black & white." },
   { icon: Icon.clock, title: "Take 3 photos together", body: "A shared 3 · 2 · 1 countdown, so you click at the same moment." },
   { icon: Icon.check, title: "Approve your favorites", body: "See each other live, chat, and keep each photo together — or retake it." },
-  { icon: Icon.image, title: "Pick your look & download", body: "Black & white or color, black or white frame — then your strip and every photo." },
+  { icon: Icon.image, title: "Pick your look & download", body: "Black & white or color and your favorite frame — then your strip and every photo." },
+];
+
+/** The two ways to use the photobooth. */
+const MODES = [
+  {
+    title: "With your person",
+    tag: null,
+    points: [
+      "You each get your own private link — they join free",
+      "See each other live and chat while you pose",
+      "Side by side in every photo on your strip",
+    ],
+  },
+  {
+    title: "Just you",
+    tag: "New",
+    points: [
+      "One private link — no invite needed",
+      "A wide photo fills each window of your strip",
+      "Same frames, same 7-day promise",
+    ],
+  },
 ];
 
 export default function PhotoboothPage() {
@@ -45,17 +67,50 @@ export default function PhotoboothPage() {
               <Eyebrow icon={(p) => <HeartIcon {...p} />}>Love, Written Photobooth</Eyebrow>
               <h1 className="mt-5 font-display text-5xl leading-[1.05] tracking-tight sm:text-6xl">Your own little photobooth, wherever you are.</h1>
               <p className="mt-5 max-w-xl text-lg leading-relaxed text-ink-soft">
-                Invite someone you love. Open your cameras. Take three photos together. Keep the moment.
+                Invite someone you love — or go solo. Open your camera. Take three photos. Keep the moment.
               </p>
               <p className="mt-6 flex items-baseline gap-2">
                 <span className="font-display text-5xl">{price}</span>
                 <span className="text-ink-soft">/ session · your person joins free</span>
+              </p>
+              <p className="mt-1 text-sm text-ink-soft">
+                {soloPrice === price ? "Solo photobooth: same price, just you." : `Solo photobooth: ${soloPrice}.`}
               </p>
               <div className="mt-7">{cta}</div>
             </Reveal>
             <Reveal delay={120}>
               <PhotoboothVisual />
             </Reveal>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-4xl px-4 pb-16 sm:px-6">
+          <Reveal className="text-center">
+            <h2 className="font-display text-3xl tracking-tight sm:text-4xl">Two ways to do it</h2>
+          </Reveal>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            {MODES.map((mode, i) => (
+              <Reveal key={mode.title} delay={i * 80}>
+                <div className="h-full rounded-[1.75rem] bg-white p-6 ring-1 ring-line">
+                  <h3 className="flex items-center gap-2 font-display text-2xl">
+                    {mode.title}
+                    {mode.tag && (
+                      <span className="rounded-full bg-rose px-2 py-0.5 font-sans text-[11px] font-semibold uppercase tracking-wide text-white">
+                        {mode.tag}
+                      </span>
+                    )}
+                  </h3>
+                  <ul className="mt-4 space-y-2.5 text-ink-soft">
+                    {mode.points.map((p) => (
+                      <li key={p} className="flex gap-2.5">
+                        <Icon.check size={16} className="mt-1 shrink-0 text-rose" />
+                        {p}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </Reveal>
+            ))}
           </div>
         </section>
 
@@ -99,8 +154,8 @@ export default function PhotoboothPage() {
               <ul className="mt-6 grid gap-3 text-sm text-cream/75 sm:grid-cols-2">
                 {[
                   "The 7 days start only when your photos are done — not when you pay.",
-                  "Your camera stays on your device. Only the photos you keep together are saved.",
-                  "Each of you gets your own private link. Nobody else can join.",
+                  "Your camera stays on your device. Only the photos you keep are saved.",
+                  "Every link is private — nobody else can join.",
                   "Camera trouble? Your paid session is never lost — come back anytime.",
                 ].map((t) => (
                   <li key={t} className="flex gap-2.5">

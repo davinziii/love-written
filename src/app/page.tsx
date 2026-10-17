@@ -216,16 +216,20 @@ export default function LandingPage() {
               <Eyebrow icon={Icon.image}>New · Love, Written Photobooth</Eyebrow>
               <h2 className="mt-5 font-display text-4xl tracking-tight sm:text-5xl">Take a photo together, even when you&rsquo;re apart.</h2>
               <p className="mt-4 text-lg leading-relaxed text-ink-soft">
-                A private digital photobooth for two. Open your cameras, capture three moments together, and turn them into a photobooth strip
-                you can keep for 7 days.
+                A private digital photobooth for two — or just for you. Open your camera, capture three moments, and turn them into a photobooth
+                strip you can keep for 7 days.
               </p>
               <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-ink-soft">
-                <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-line">Two people</span>
+                <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-line">Two people — or solo</span>
                 <Icon.arrowRight size={14} className="text-rose" aria-hidden />
                 <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-line">Three photos</span>
                 <Icon.arrowRight size={14} className="text-rose" aria-hidden />
                 <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-line">One photobooth strip</span>
               </div>
+              <p className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-petal px-4 py-2.5 text-sm">
+                <span className="rounded-full bg-rose px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white">New</span>
+                A solo photobooth — just you, your camera and three photos.
+              </p>
               <div className="mt-8 flex flex-wrap items-center gap-5">
                 <Link href="/photobooth" className={ctaClasses.primary}>
                   Try the Photobooth <Icon.arrowRight size={18} />
