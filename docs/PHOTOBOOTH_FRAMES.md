@@ -13,6 +13,7 @@ src/photobooth/frames/
 public/photobooth/frames/
   my-new-frame/
     frame.png              ← the design, with transparent "windows" where photos go
+    frame-solo.png         ← same design, one window per slot (solo photobooth)
     preview.png            ← small picture shown in the selector
 ```
 
@@ -25,9 +26,16 @@ the server can read the overlay. The folder name = the frame `id`.)
 - Any size works; keep it ≤ 2400 px on the long side and keep the 1 : 3 ratio for a
   "real" strip. Every number in the config is in these output pixels.
 
+## 1b. Landscape frames
+
+Any shape works — the strip builder and the live preview only read `width`, `height` and the
+slot coordinates. A landscape design (e.g. **3600 × 2400**, four slots in a 2 × 2 grid) is just a
+config with different numbers. Keep the long side ≤ 2400 px if you can (larger is fine, just
+slower to build). The result screen shows wide frames wide automatically.
+
 ## 2. Where the photos go (slots)
 
-There are always **4 slots**, top to bottom (photo 1 → photo 4). Each slot holds one moment
+There are always **3 slots** (one per photo, `PHOTOBOOTH_ROUNDS`), in photo order. Each slot holds one moment
 from **both** people: **Person A on the left, Person B on the right**, separated by a
 `gutter` you choose. So each slot is really two photo windows side by side.
 
@@ -63,12 +71,21 @@ Properties with units set to pixels.
 - Keep it small: flat colours compress well. Aim for < 300 KB (export as "PNG-8" / 64–256
   colours if it still looks right).
 
+## 4b. Export `frame-solo.png` (for the solo photobooth)
+
+The same design, but with **one** transparent window per slot (the whole slot). Solo sessions
+capture one **landscape 3 : 2** photo per moment, which fills the slot — so solo slots look best
+close to 3 : 2 (1080 × 720 is exactly that). Set it as `soloOverlay` in the config. Without one,
+solo strips fall back to `frame.png`, whose divider between the two windows would cross the photo.
+
 ## 5. Export `preview.png`
 
 - What people see in "Choose your photobooth" (and the landing page shows the default one).
 - About **400 px wide**, same 1 : 3 ratio, with sample photos inside so it looks finished.
-- Tip: run the project's builder as an example of how ours is made:
-  `node scripts/photobooth/build-frames.mjs` (builds the Black and White frames).
+- Tip: run the project's builders as examples of how ours are made:
+  `node scripts/photobooth/build-frames.mjs` (Black and White) and
+  `node scripts/photobooth/build-design-frames.mjs` (the "Love, Written." designs: Cream, Maroon,
+  Noir and the two wide ones). Each writes `frame.png`, `frame-solo.png` and `preview.png`.
 
 ## 6. Write `config.ts`
 
@@ -89,11 +106,11 @@ const frame: PhotoboothFrame = {
     { ...SLOT, y: 60 },               // photo 1
     { ...SLOT, y: 820 },              // photo 2
     { ...SLOT, y: 1580 },             // photo 3
-    { ...SLOT, y: 2340 },             // photo 4
   ],
   gutter: 20,                         // space between Person A and Person B inside a slot
   grayscale: false,                   // default filter (people pick B&W or color after their photos)
   overlay: "/photobooth/frames/my-new-frame/frame.png",   // or null for no overlay
+  soloOverlay: "/photobooth/frames/my-new-frame/frame-solo.png", // one window per slot (solo)
   preview: "/photobooth/frames/my-new-frame/preview.png",
 };
 
@@ -101,8 +118,8 @@ export default frame;
 ```
 
 People choose **black & white or color** themselves after their photos (and which frame);
-`grayscale` is just the default shown before they choose. The live camera and the four
-individual photo downloads always stay in colour.
+the choice starts on the look they used for their live camera. The individual photo
+downloads always stay in colour.
 
 ## 7. Register it (the only code change)
 
@@ -118,7 +135,7 @@ The first frame in the list is the default. The selector shows them in this orde
 
 ## 8. Test it
 
-1. `npx vitest run tests/photobooth.test.ts` — checks every frame config (4 slots, inside
+1. `npx vitest run tests/photobooth.test.ts` — checks every frame config (3 slots, inside
    the image, big enough, paths in the right folder).
 2. `npm run dev`, open a photobooth session → your frame appears in *Choose your photobooth*.
 3. Finish a session with it (two browsers or phone + laptop) and look at the downloaded
@@ -126,7 +143,7 @@ The first frame in the list is the default. The selector shows them in this orde
 
 ## How the final image is made
 
-On the server, after photo 4 is approved by both people (`composeStrip` in
+On the server, after the last photo is approved by both people (`composeStrip` in
 `src/lib/photobooth/images.ts`):
 
 1. Start a blank `width × height` canvas filled with `background`.

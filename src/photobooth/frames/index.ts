@@ -2,6 +2,11 @@ import type { PhotoboothFrame } from "./types";
 import { PHOTOBOOTH_ROUNDS } from "@/lib/photobooth/constants";
 import blackWhite from "./black-white/config";
 import white from "./white/config";
+import cream from "./cream/config";
+import maroon from "./maroon/config";
+import noir from "./noir/config";
+import landscapeRed from "./landscape-red/config";
+import landscapeBlack from "./landscape-black/config";
 
 export type { PhotoboothFrame, PhotoSlot } from "./types";
 
@@ -10,7 +15,7 @@ export type { PhotoboothFrame, PhotoSlot } from "./types";
  * To add a frame: create its folder (see docs/PHOTOBOOTH_FRAMES.md), then add ONE import
  * and ONE entry here. Nothing else in the photobooth needs to change.
  */
-export const FRAMES: readonly PhotoboothFrame[] = [blackWhite, white];
+export const FRAMES: readonly PhotoboothFrame[] = [blackWhite, white, cream, maroon, noir, landscapeRed, landscapeBlack];
 
 export const DEFAULT_FRAME_ID = FRAMES[0]!.id;
 
