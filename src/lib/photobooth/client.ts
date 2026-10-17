@@ -35,14 +35,26 @@ export function rememberBoothToken(sessionId: string, token: string) {
   storage()?.setItem(TOKEN_KEY(sessionId), token);
 }
 
-/** A random id for this browser, so one link can't be used on two devices at once. */
+let cachedDevice: string | null = null;
+
+/**
+ * A random id for this browser, so the server knows which device holds a link right now.
+ * Kept in memory too: where storage is blocked (some in-app browsers, privacy modes) a new
+ * id on every request would look like a different device each time.
+ */
 export function deviceId(): string {
-  const s = storage();
-  let id = s?.getItem(DEVICE_KEY);
-  if (!id) {
-    id = crypto.randomUUID();
-    s?.setItem(DEVICE_KEY, id);
+  if (cachedDevice) return cachedDevice;
+  let id: string | null = null;
+  try {
+    id = storage()?.getItem(DEVICE_KEY) ?? null;
+    if (!id) {
+      id = crypto.randomUUID();
+      storage()?.setItem(DEVICE_KEY, id);
+    }
+  } catch {
+    id = id ?? crypto.randomUUID();
   }
+  cachedDevice = id;
   return id;
 }
 
@@ -55,11 +67,17 @@ export function boothApi<T>(
   sessionId: string,
   token: string,
   path: string,
-  opts: { method?: string; body?: unknown; retries?: number; timeoutMs?: number } = {},
+  opts: { method?: string; body?: unknown; retries?: number; timeoutMs?: number; takeover?: boolean } = {},
 ): Promise<T> {
+  const { takeover, ...rest } = opts;
   return api<T>(`/api/photobooth/${sessionId}${path}`, {
-    ...opts,
-    headers: { "x-lw-booth-token": token, "x-lw-booth-device": deviceId() },
+    ...rest,
+    headers: {
+      "x-lw-booth-token": token,
+      "x-lw-booth-device": deviceId(),
+      // "This device takes the link now" — sent when the page opens and on "Use it here".
+      ...(takeover ? { "x-lw-booth-takeover": "1" } : {}),
+    },
   });
 }
 

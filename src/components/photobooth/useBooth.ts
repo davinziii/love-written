@@ -32,9 +32,13 @@ export function useBooth(sessionId: string, { slow = false }: { slow?: boolean }
   const offset = useRef<{ ms: number; rtt: number }>({ ms: 0, rtt: Infinity });
   const inFlight = useRef<Promise<void> | null>(null);
   const again = useRef(false);
+  // The first read from this page takes the link over (the newest page wins); later reads don't.
+  const claim = useRef(true);
+  // Another device took the link: stop reading until this one asks for it back.
+  const moved = useRef(false);
 
   const refresh = useCallback(async (): Promise<void> => {
-    if (!token) return;
+    if (!token || moved.current) return;
     // One read at a time; a nudge that arrives mid-read triggers exactly one more.
     if (inFlight.current) {
       again.current = true;
@@ -44,7 +48,8 @@ export function useBooth(sessionId: string, { slow = false }: { slow?: boolean }
       const t0 = Date.now();
       try {
         // Short timeout: a hung read must never block the next ones (state would freeze).
-        const next = await boothApi<BoothState>(sessionId, token, "", { retries: 1, timeoutMs: 8_000 });
+        const next = await boothApi<BoothState>(sessionId, token, "", { retries: 1, timeoutMs: 8_000, takeover: claim.current });
+        claim.current = false;
         const t1 = Date.now();
         // Keep the offset from the fastest round trip seen (least network noise).
         const rtt = t1 - t0;
@@ -58,6 +63,10 @@ export function useBooth(sessionId: string, { slow = false }: { slow?: boolean }
         if (err instanceof ClientApiError && err.code === "NETWORK") {
           setOffline(true);
           setQuality("weak");
+        }
+        else if (err instanceof ClientApiError && err.code === "BOOTH_MOVED") {
+          moved.current = true;
+          setLoadError({ code: err.code, message: err.message });
         }
         else if (err instanceof ClientApiError && (err.status === 404 || err.status === 409 || err.status === 429)) {
           setLoadError({ code: err.code, message: err.message });
@@ -152,10 +161,18 @@ export function useBooth(sessionId: string, { slow = false }: { slow?: boolean }
     [sessionId, token, refresh],
   );
 
+  /** "Use it here": take the link back from the other device. */
+  const takeOver = useCallback(() => {
+    moved.current = false;
+    claim.current = true;
+    setLoadError(null);
+    void refresh();
+  }, [refresh]);
+
   /** Server time now, in this browser's clock terms. */
   const serverNow = useCallback(() => Date.now() + offset.current.ms, []);
 
-  return { token, state, loadError, offline, live, quality, refresh, act, serverNow };
+  return { token, state, loadError, offline, live, quality, refresh, takeOver, act, serverNow };
 }
 
 export type Booth = ReturnType<typeof useBooth>;

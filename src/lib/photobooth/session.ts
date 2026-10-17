@@ -32,6 +32,8 @@ import { nudge } from "./realtime";
 
 export const BOOTH_TOKEN_HEADER = "x-lw-booth-token";
 export const BOOTH_DEVICE_HEADER = "x-lw-booth-device";
+/** Sent when a page opens (or on "Use it here"): this device takes the link from now on. */
+export const BOOTH_TAKEOVER_HEADER = "x-lw-booth-takeover";
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GENERATION_STALE_SECONDS = 90;
@@ -39,11 +41,11 @@ const MAX_GENERATION_ATTEMPTS = 3;
 
 export const BoothErrors = {
   notFound: () => new ApiError(404, "BOOTH_NOT_FOUND", "This photobooth link isn't valid, or the photobooth has ended."),
-  inUse: () =>
+  moved: () =>
     new ApiError(
       409,
-      "BOOTH_IN_USE",
-      "This photobooth is already full — this link is open on another device right now. If that's you, close it there and try again in a moment.",
+      "BOOTH_MOVED",
+      "This photobooth link was opened on another device or browser. You can keep using it here instead.",
     ),
   stale: () => new ApiError(409, "BOOTH_STALE", "The photobooth moved on — refreshing."),
 };
@@ -119,12 +121,15 @@ export async function authorizeBooth(sessionId: string, req: Request, { claimDev
   const session = me ? await loadSession(sessionId) : null;
   if (!me || !session || session.status === "DELETED" || (!partner && session.party_size !== 1)) throw await fail();
 
-  // One device per link at a time while the photobooth is running. A new device can take over
-  // once the old one goes quiet, so switching phones works — but a forwarded link can't join a
-  // session in progress. Results (COMPLETED) can be opened on any number of devices.
+  // One device per link at a time while the photobooth is running, so two copies of the same
+  // person never fight over the camera. The newest page wins: opening the link (or tapping
+  // "Use it here") takes it over, and the older page is told and stops. Without a takeover, a
+  // device that isn't the current one only gets in once the current one has gone quiet.
+  // Results (COMPLETED) can be opened on any number of devices.
   const running = liveViewOn(session.status);
-  if (claimDevice && running && device && me.device_id && me.device_id !== device && me.last_seen_at) {
-    if (Date.now() - new Date(me.last_seen_at).getTime() < DEVICE_TAKEOVER_MS) throw BoothErrors.inUse();
+  const takeover = req.headers.get(BOOTH_TAKEOVER_HEADER) === "1";
+  if (claimDevice && running && !takeover && device && me.device_id && me.device_id !== device && me.last_seen_at) {
+    if (Date.now() - new Date(me.last_seen_at).getTime() < DEVICE_TAKEOVER_MS) throw BoothErrors.moved();
   }
   return { session, me, partner };
 }

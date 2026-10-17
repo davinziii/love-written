@@ -72,7 +72,7 @@ export function BoothApp({ sessionId, justPaid, cancelled }: { sessionId: string
 
   if (token === undefined) return <Shell><Loading /></Shell>;
   if (token === null) return <Shell><NoLink /></Shell>;
-  if (booth.loadError) return <Shell><LoadError error={booth.loadError} onRetry={() => void booth.refresh()} /></Shell>;
+  if (booth.loadError) return <Shell><LoadError error={booth.loadError} onRetry={() => void booth.refresh()} onTakeOver={booth.takeOver} /></Shell>;
   if (!state) return <Shell><Loading /></Shell>;
 
   const myLink = ownLink(sessionId, token);
@@ -1027,12 +1027,22 @@ function NoLink() {
   );
 }
 
-function LoadError({ error, onRetry }: { error: { code: string; message: string }; onRetry: () => void }) {
-  const full = error.code === "BOOTH_IN_USE";
+function LoadError({ error, onRetry, onTakeOver }: { error: { code: string; message: string }; onRetry: () => void; onTakeOver: () => void }) {
+  if (error.code === "BOOTH_MOVED") {
+    return (
+      <Card className="text-center">
+        <p className="font-display text-2xl">Opened somewhere else</p>
+        <p className="mt-2 text-ink-soft">Your photobooth link was just opened on another device or browser, so it&rsquo;s running there now.</p>
+        <Button className="mt-5" onClick={onTakeOver}>
+          Use it here instead
+        </Button>
+      </Card>
+    );
+  }
   return (
     <Card className="text-center">
-      <p className="font-display text-2xl">{full ? "This photobooth is already full" : error.code === "RATE_LIMITED" ? "One moment…" : "We couldn't open this photobooth"}</p>
-      <p className="mt-2 text-ink-soft">{full ? "This link is open on another device right now. If that's you, close it there and try again in a moment." : error.message}</p>
+      <p className="font-display text-2xl">{error.code === "RATE_LIMITED" ? "One moment…" : "We couldn't open this photobooth"}</p>
+      <p className="mt-2 text-ink-soft">{error.message}</p>
       <Button variant="secondary" className="mt-5" onClick={onRetry}>
         Try again
       </Button>
