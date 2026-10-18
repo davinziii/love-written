@@ -356,7 +356,11 @@ function HoldButton({
       disabled={disabled}
       onPointerDown={(e: ReactPointerEvent<HTMLButtonElement>) => {
         e.preventDefault();
-        e.currentTarget.setPointerCapture?.(e.pointerId);
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          // Some browsers refuse capture (e.g. a pointer that already ended) — the press still counts.
+        }
         onStart();
       }}
       onPointerUp={onStop}

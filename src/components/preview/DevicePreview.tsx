@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@/components/ui/icons";
 import { PhoneFrame, Watermark } from "./PhoneFrame";
@@ -12,6 +12,9 @@ export type Device = "desktop" | "mobile";
  * Desktop / Mobile / Full preview of a surprise. `render` is called for whichever view
  * is active, so each view gets its own layout (container queries in the renderer pick
  * the wide or the phone layout from the real width).
+ *
+ * "Start over" remounts the surprise, so intros, games and envelopes play again from the
+ * very beginning — exactly what the recipient sees when they first open the link.
  */
 export function DevicePreview({
   render,
@@ -32,6 +35,9 @@ export function DevicePreview({
 }) {
   const [device, setDevice] = useState<Device>(defaultDevice);
   const [full, setFull] = useState(false);
+  /** Bumped by "Start over": a new key gives the surprise a completely fresh start. */
+  const [run, setRun] = useState(0);
+  const restart = () => setRun((n) => n + 1);
 
   return (
     <div>
@@ -58,17 +64,28 @@ export function DevicePreview({
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => setFull(true)}
-          className="lw-press inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3.5 py-2 text-sm font-medium text-ink-soft shadow-sm ring-1 ring-line hover:text-ink"
-        >
-          <Icon.expand size={15} />
-          {compact ? <span className="sr-only">Full preview</span> : "Full preview"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={restart}
+            title="Play the surprise again from the beginning"
+            className="lw-press inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3.5 py-2 text-sm font-medium text-ink-soft shadow-sm ring-1 ring-line hover:text-ink"
+          >
+            <Icon.refresh size={15} />
+            {compact ? <span className="sr-only">Start over</span> : "Start over"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFull(true)}
+            className="lw-press inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3.5 py-2 text-sm font-medium text-ink-soft shadow-sm ring-1 ring-line hover:text-ink"
+          >
+            <Icon.expand size={15} />
+            {compact ? <span className="sr-only">Full preview</span> : "Full preview"}
+          </button>
+        </div>
       </div>
 
-      <div key={device} className="animate-fade-up">
+      <div key={`${device}-${run}`} className="animate-fade-up">
         {device === "desktop" ? (
           <BrowserFrame height={desktopHeight} watermark={watermark} label={`${label} — desktop`}>
             {render()}
@@ -80,7 +97,11 @@ export function DevicePreview({
         )}
       </div>
 
-      {full && <FullPreview onClose={() => setFull(false)} watermark={watermark} label={label}>{render()}</FullPreview>}
+      {full && (
+        <FullPreview onClose={() => setFull(false)} onRestart={restart} watermark={watermark} label={label}>
+          <Fragment key={run}>{render()}</Fragment>
+        </FullPreview>
+      )}
     </div>
   );
 }
@@ -89,11 +110,13 @@ export function DevicePreview({
 export function FullPreview({
   children,
   onClose,
+  onRestart,
   watermark,
   label,
 }: {
   children: ReactNode;
   onClose: () => void;
+  onRestart?: () => void;
   watermark: boolean;
   label: string;
 }) {
@@ -118,15 +141,28 @@ export function FullPreview({
         {children}
       </div>
       {watermark && <Watermark />}
-      <button
-        type="button"
-        onClick={onClose}
-        autoFocus
-        className="lw-press fixed right-4 top-4 z-30 inline-flex items-center gap-2 rounded-full bg-ink/85 px-4 py-2.5 text-sm font-medium text-cream shadow-lg backdrop-blur"
-      >
-        <Icon.close size={16} />
-        Close preview
-      </button>
+      <div className="fixed right-4 top-4 z-30 flex items-center gap-2">
+        {onRestart && (
+          <button
+            type="button"
+            onClick={onRestart}
+            title="Play the surprise again from the beginning"
+            className="lw-press inline-flex items-center gap-2 rounded-full bg-ink/85 px-4 py-2.5 text-sm font-medium text-cream shadow-lg backdrop-blur"
+          >
+            <Icon.refresh size={16} />
+            <span className="max-sm:sr-only">Start over</span>
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onClose}
+          autoFocus
+          className="lw-press inline-flex items-center gap-2 rounded-full bg-ink/85 px-4 py-2.5 text-sm font-medium text-cream shadow-lg backdrop-blur"
+        >
+          <Icon.close size={16} />
+          Close preview
+        </button>
+      </div>
     </div>,
     document.body,
   );
