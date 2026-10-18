@@ -13,6 +13,7 @@ import { letterForYouDefinition } from "./letter-for-you/definition";
 import { loveflixDefinition } from "./loveflix/definition";
 import { journalDefinition } from "./journal/definition";
 import { cdCollectionDefinition } from "./cd-collection/definition";
+import { pixelHeartHuntDefinition } from "./pixel-heart-hunt/definition";
 
 export const TEMPLATES = {
   "our-story": ourStoryDefinition,
@@ -20,6 +21,7 @@ export const TEMPLATES = {
   loveflix: loveflixDefinition,
   journal: journalDefinition,
   "cd-collection": cdCollectionDefinition,
+  "pixel-heart-hunt": pixelHeartHuntDefinition,
 } as const satisfies Record<string, TemplateDefinition>;
 
 export type TemplateId = keyof typeof TEMPLATES;

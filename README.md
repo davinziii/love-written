@@ -70,6 +70,8 @@ src/
     letter-for-you/            A Letter for You (envelope, letter, 10–12 photos)
     loveflix/                  Loveflix (streaming-style intro, profiles, title page, memory viewer)
     journal/                   Journal (fan of photo pages, hardcover page turn, framed extras, words)
+    cd-collection/             CD Collection (a shelf of jewel cases; pull one out to open its memory)
+    pixel-heart-hunt/          Pixel Heart Hunt (canvas bow-and-arrow game → 5 photos → letter → endless mode)
   components/
     editor/                    GenericEditor + FieldControl (schema-driven, template-agnostic)
     studio/                    customer flow: edit → preview → pay → finalize / failed / scheduled / live

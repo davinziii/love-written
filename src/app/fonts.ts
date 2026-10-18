@@ -11,6 +11,7 @@ import {
   Lora,
   Nunito,
   Parisienne,
+  Pixelify_Sans,
   Playfair_Display,
   Quicksand,
   Sacramento,
@@ -44,6 +45,8 @@ const playfair = Playfair_Display({ subsets: ["latin"], display: "swap", preload
 // Template display fonts (used by a single template)
 /** The cinema-style wordmark in "Loveflix". */
 const bebas = Bebas_Neue({ subsets: ["latin"], display: "swap", preload: false, variable: "--font-bebas", weight: "400" });
+/** The pixel lettering in "Pixel Heart Hunt". */
+const pixelify = Pixelify_Sans({ subsets: ["latin"], display: "swap", preload: false, variable: "--font-pixel", weight: ["400", "700"] });
 
 export const fontVariables = [
   inter,
@@ -61,6 +64,7 @@ export const fontVariables = [
   caveat,
   playfair,
   bebas,
+  pixelify,
 ]
   .map((f) => f.variable)
   .join(" ");

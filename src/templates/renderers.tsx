@@ -12,6 +12,7 @@ import { LetterForYouRenderer } from "./letter-for-you/LetterForYouRenderer";
 import { LoveflixRenderer } from "./loveflix/LoveflixRenderer";
 import { JournalRenderer } from "./journal/JournalRenderer";
 import { CdCollectionRenderer } from "./cd-collection/CdCollectionRenderer";
+import { PixelHeartHuntRenderer } from "./pixel-heart-hunt/PixelHeartHuntRenderer";
 
 export type RenderData = Record<string, string | undefined>;
 type AnyRenderer = ComponentType<RendererProps<RenderData>>;
@@ -30,6 +31,7 @@ export const RENDERERS: Record<TemplateId, AnyRenderer> = {
   loveflix: register(LoveflixRenderer),
   journal: register(JournalRenderer),
   "cd-collection": register(CdCollectionRenderer),
+  "pixel-heart-hunt": register(PixelHeartHuntRenderer),
 };
 
 export function TemplateExperience({
