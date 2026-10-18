@@ -345,16 +345,17 @@ export const TEMPLATES = {
 `src/templates/renderers.tsx`:
 
 ```ts
-import { BirthdaySurpriseRenderer } from "./birthday-surprise/BirthdaySurpriseRenderer";
-
-export const RENDERERS: Record<TemplateId, AnyRenderer> = {
-  "our-story": register(OurStoryRenderer),
-  "birthday-surprise": register(BirthdaySurpriseRenderer),   // ← add
+const RENDERERS: Record<TemplateId, AnyRenderer> = {
+  "our-story": dynamic(() => import("./our-story/OurStoryRenderer").then((m) => register(m.OurStoryRenderer))),
+  "birthday-surprise": dynamic(() =>                                                     // ← add
+    import("./birthday-surprise/BirthdaySurpriseRenderer").then((m) => register(m.BirthdaySurpriseRenderer)),
+  ),
 };
 ```
 
 If you forget this step, **TypeScript refuses to compile** — the renderer map must cover
-every template id.
+every template id. Each renderer is loaded with `dynamic()` so it becomes its own chunk:
+a recipient's page downloads only its template's code and CSS, never the others.
 
 ### Step 6 — The generic editor does the rest
 

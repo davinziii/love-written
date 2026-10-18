@@ -4,7 +4,7 @@ import { SiteFooter, SiteHeader } from "@/components/ui/Brand";
 import { PhoneFrame } from "@/components/preview/PhoneFrame";
 import { ResumeDraftBanner } from "@/components/catalog/ResumeDraftBanner";
 import { Eyebrow, GradientBlobs } from "@/components/landing/Decor";
-import { PauseOffscreen, Reveal } from "@/components/motion/Motion";
+import { MountWhenNear, PauseOffscreen, Reveal } from "@/components/motion/Motion";
 import { HeartIcon, Icon } from "@/components/ui/icons";
 import { TemplateExperience } from "@/templates/renderers";
 import { listedTemplates, type TemplateId } from "@/templates";
@@ -38,7 +38,14 @@ export default function CatalogPage() {
                 <PauseOffscreen className="relative bg-[radial-gradient(70%_60%_at_50%_30%,#f6d5dc,transparent_70%)] px-10 pt-8">
                   <div className="transition duration-500 [transition-timing-function:var(--ease-out-soft)] group-hover:-translate-y-2 group-hover:scale-[1.02]">
                     <PhoneFrame height={380} interactive={false} label={`${t.name} preview`}>
-                      <TemplateExperience templateId={t.id as TemplateId} data={t.sample} mode="preview" />
+                      {/* The first row renders with the page; the rest start once scrolled near. */}
+                      {i < 3 ? (
+                        <TemplateExperience templateId={t.id as TemplateId} data={t.sample} mode="preview" />
+                      ) : (
+                        <MountWhenNear className="min-h-full">
+                          <TemplateExperience templateId={t.id as TemplateId} data={t.sample} mode="preview" />
+                        </MountWhenNear>
+                      )}
                     </PhoneFrame>
                   </div>
                   <span className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-medium shadow-sm">
@@ -63,9 +70,9 @@ export default function CatalogPage() {
           ))}
           <Reveal as="li" delay={templates.length * 90}>
             <div className="flex h-full min-h-72 flex-col items-center justify-center rounded-[2rem] border-2 border-dashed border-line bg-white/40 p-8 text-center">
-              <span className="lw-bob grid h-14 w-14 place-items-center rounded-2xl bg-petal text-rose">
+              <PauseOffscreen className="lw-bob grid h-14 w-14 place-items-center rounded-2xl bg-petal text-rose">
                 <Icon.sparkle size={26} />
-              </span>
+              </PauseOffscreen>
               <p className="mt-5 font-display text-2xl">More surprises soon</p>
               <ul className="mt-4 flex flex-wrap justify-center gap-2">
                 {COMING.map((c) => (

@@ -52,6 +52,8 @@ export function ScaledViewport({
     <div ref={outer} className="relative overflow-hidden" style={{ height }}>
       <div
         data-lw-scroll
+        // Non-interactive thumbnails (catalog cards, the hero): renderers may animate less here.
+        data-lw-decorative={interactive ? undefined : ""}
         role="region"
         aria-label={label}
         tabIndex={interactive ? 0 : -1}

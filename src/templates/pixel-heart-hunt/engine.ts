@@ -250,6 +250,20 @@ export class HeartHuntEngine {
   }
 
   /**
+   * Whether anything fast is on screen (arrows, pops, sparkles, aiming, a heart appearing).
+   * When not, only the slow scenery moves — stars, clouds and the whole-pixel heart bob.
+   */
+  isBusy(): boolean {
+    return (
+      this.arrows.length > 0 ||
+      this.particles.length > 0 ||
+      this.aimDir !== 0 ||
+      this.shootHeld ||
+      this.hearts.some((h) => h.popT !== null || h.age < 0.3)
+    );
+  }
+
+  /**
    * Aim assist, decided once when the arrow leaves (so it never bends mid-air toward a
    * different heart): the heart nearest the aim line, if it's close, gets a slightly corrected shot.
    */

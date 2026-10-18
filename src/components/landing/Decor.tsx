@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { HeartIcon, Icon } from "@/components/ui/icons";
+import { PauseOffscreen } from "@/components/motion/Motion";
 
 /**
  * Decorative, server-rendered motion layers. Pure CSS animation (see globals.css):
@@ -20,7 +21,8 @@ export function GradientBlobs({ variant = "hero" }: { variant?: "hero" | "soft" 
           { c: "#fbe3d3", s: "26rem", top: "40%", left: "70%", t: "36s" },
         ];
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+    // Paused while scrolled away: any running animation keeps the page repainting.
+    <PauseOffscreen aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
       {blobs.map((b, i) => (
         <span
           key={i}
@@ -28,7 +30,7 @@ export function GradientBlobs({ variant = "hero" }: { variant?: "hero" | "soft" 
           style={{ background: b.c, width: b.s, height: b.s, top: b.top, left: b.left, "--t": b.t } as CSSProperties}
         />
       ))}
-    </div>
+    </PauseOffscreen>
   );
 }
 

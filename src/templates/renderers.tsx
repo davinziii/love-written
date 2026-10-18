@@ -1,18 +1,19 @@
+"use client";
+
 /**
  * Renderer registry: template id → trusted React component.
  *
  * The type `Record<TemplateId, …>` means TypeScript refuses to compile if a template
  * in `index.ts` has no renderer registered here.
+ *
+ * Each renderer (with its CSS) is its own chunk, loaded only where that template is shown:
+ * a recipient's page downloads one template, not all of them. Pages still render the
+ * template on the server, and Next.js preloads the chunk it used.
  */
+import dynamic from "next/dynamic";
 import type { ComponentType } from "react";
 import type { TemplateId } from "./index";
 import type { RendererProps } from "./types";
-import { OurStoryRenderer } from "./our-story/OurStoryRenderer";
-import { LetterForYouRenderer } from "./letter-for-you/LetterForYouRenderer";
-import { LoveflixRenderer } from "./loveflix/LoveflixRenderer";
-import { JournalRenderer } from "./journal/JournalRenderer";
-import { CdCollectionRenderer } from "./cd-collection/CdCollectionRenderer";
-import { PixelHeartHuntRenderer } from "./pixel-heart-hunt/PixelHeartHuntRenderer";
 
 export type RenderData = Record<string, string | undefined>;
 type AnyRenderer = ComponentType<RendererProps<RenderData>>;
@@ -25,13 +26,13 @@ function register<D>(renderer: ComponentType<RendererProps<D>>): AnyRenderer {
   return renderer as unknown as AnyRenderer;
 }
 
-export const RENDERERS: Record<TemplateId, AnyRenderer> = {
-  "our-story": register(OurStoryRenderer),
-  "letter-for-you": register(LetterForYouRenderer),
-  loveflix: register(LoveflixRenderer),
-  journal: register(JournalRenderer),
-  "cd-collection": register(CdCollectionRenderer),
-  "pixel-heart-hunt": register(PixelHeartHuntRenderer),
+const RENDERERS: Record<TemplateId, AnyRenderer> = {
+  "our-story": dynamic(() => import("./our-story/OurStoryRenderer").then((m) => register(m.OurStoryRenderer))),
+  "letter-for-you": dynamic(() => import("./letter-for-you/LetterForYouRenderer").then((m) => register(m.LetterForYouRenderer))),
+  loveflix: dynamic(() => import("./loveflix/LoveflixRenderer").then((m) => register(m.LoveflixRenderer))),
+  journal: dynamic(() => import("./journal/JournalRenderer").then((m) => register(m.JournalRenderer))),
+  "cd-collection": dynamic(() => import("./cd-collection/CdCollectionRenderer").then((m) => register(m.CdCollectionRenderer))),
+  "pixel-heart-hunt": dynamic(() => import("./pixel-heart-hunt/PixelHeartHuntRenderer").then((m) => register(m.PixelHeartHuntRenderer))),
 };
 
 export function TemplateExperience({

@@ -109,19 +109,42 @@ export function GameCanvas({
       drawRef.current();
       return;
     }
+    // Pixel art gains nothing above 60 fps, so 90/120/144 Hz screens don't pay for 2× the
+    // frames. While nothing fast is happening (no arrow, pop or aiming) only the slow scenery
+    // moves, in whole-pixel steps, so 30 fps looks the same; a non-interactive thumbnail
+    // (e.g. a catalog card) always runs at 30. A tap still repaints at once (onPointerDown).
+    const decorative = Boolean(wrapRef.current?.closest("[data-lw-decorative]"));
+    const intervalNow = () => 1000 / (decorative || !game.isBusy() ? 30 : 60);
     let raf = 0;
+    let timer = 0;
     let last = performance.now();
+    let due = last;
     const frame = (now: number) => {
+      const interval = intervalNow();
+      if (now - due < interval - 1) {
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+      due += interval;
+      if (now - due > interval) due = now; // fell behind (slow frame): don't try to catch up
       const dt = Math.max(0, (now - last) / 1000);
       last = now;
       sceneT.current += Math.min(dt, 0.1);
       const events = game.update(dt, reduced.current);
       if (events.length) latest.current.onEvents(events);
       drawRef.current();
-      raf = requestAnimationFrame(frame);
+      // At 30 fps, sleep until just before the next frame instead of asking for every display
+      // refresh: each requested frame makes the browser do a full frame of work, even if we skip it.
+      const next = intervalNow();
+      const wait = due + next - performance.now() - 8;
+      if (next > 20 && wait > 0) timer = window.setTimeout(() => (raf = requestAnimationFrame(frame)), wait);
+      else raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(timer);
+    };
   }, [active, engineRef]);
 
   // A palette change (in the editor) repaints the still frame.

@@ -65,7 +65,15 @@ export function Reveal({
  * Pauses every CSS animation inside while the region is off-screen, so decorative
  * motion costs nothing when nobody can see it.
  */
-export function PauseOffscreen({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function PauseOffscreen({
+  children,
+  className = "",
+  "aria-hidden": ariaHidden,
+}: {
+  children?: ReactNode;
+  className?: string;
+  "aria-hidden"?: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [offscreen, setOffscreen] = useState(false);
   useEffect(() => {
@@ -76,8 +84,39 @@ export function PauseOffscreen({ children, className = "" }: { children: ReactNo
     return () => io.disconnect();
   }, []);
   return (
-    <div ref={ref} className={className} data-offscreen={offscreen}>
+    <div ref={ref} className={className} data-offscreen={offscreen} aria-hidden={ariaHidden}>
       {children}
+    </div>
+  );
+}
+
+/**
+ * Mounts its children only once they come near the viewport (and keeps them mounted).
+ * For heavy below-the-fold content such as live surprise previews: the server sends a
+ * placeholder, so the page hydrates and lays out less up front. Content inside a hidden
+ * (display: none) box never mounts. Give the box its own size so nothing shifts.
+ */
+export function MountWhenNear({ children, className = "", rootMargin = "600px" }: { children: ReactNode; className?: string; rootMargin?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || near) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setNear(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [near, rootMargin]);
+  return (
+    <div ref={ref} className={className}>
+      {near ? children : null}
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { PhoneFrame } from "@/components/preview/PhoneFrame";
 import { BrowserFrame } from "@/components/preview/BrowserFrame";
-import { PauseOffscreen } from "@/components/motion/Motion";
+import { MountWhenNear, PauseOffscreen } from "@/components/motion/Motion";
 import { TemplateExperience } from "@/templates/renderers";
 import type { TemplateId } from "@/templates";
 import type { RenderData } from "@/templates/renderers";
@@ -18,7 +18,10 @@ export function HeroDevices({ templateId, data }: { templateId: TemplateId; data
     <PauseOffscreen className="relative mx-auto w-full max-w-[640px] sm:pb-10">
       <div className="hidden w-[78%] sm:block">
         <BrowserFrame height={380} interactive={false} label="Example surprise on a laptop">
-          <TemplateExperience templateId={templateId} data={data} mode="preview" />
+          {/* Hidden on phones: mounting it only when shown saves a second live surprise there. */}
+          <MountWhenNear className="min-h-full">
+            <TemplateExperience templateId={templateId} data={data} mode="preview" />
+          </MountWhenNear>
         </BrowserFrame>
       </div>
       <div className="relative z-10 mx-auto w-[min(300px,82vw)] sm:absolute sm:bottom-0 sm:right-2 sm:w-[210px] sm:rotate-[2deg]">

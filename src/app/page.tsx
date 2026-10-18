@@ -62,9 +62,9 @@ export default function LandingPage() {
                 highlight="never forget"
                 className="mt-6 font-display text-[2.9rem] leading-[1.02] tracking-tight sm:text-6xl lg:text-[4.6rem]"
               />
-              <div className="mt-5">
+              <PauseOffscreen className="mt-5">
                 <TypedLine text="For Samantha, from Vinz ♥" />
-              </div>
+              </PauseOffscreen>
               <p
                 className="animate-fade-up mx-auto mt-5 max-w-xl text-lg leading-relaxed text-ink-soft lg:mx-0"
                 style={{ animationDelay: "1.1s" } as CSSProperties}
@@ -137,12 +137,12 @@ export default function LandingPage() {
 
               <Reveal className="md:col-span-3" delay={180}>
                 <article className="lw-lift flex h-full items-center gap-6 overflow-hidden rounded-[2rem] bg-ink p-7 text-cream">
-                  <span className="relative grid h-20 w-20 shrink-0 place-items-center rounded-full bg-rose text-white">
+                  <PauseOffscreen className="relative grid h-20 w-20 shrink-0 place-items-center rounded-full bg-rose text-white">
                     <span className="lw-bob" style={{ "--t": "2.4s" } as CSSProperties}>
                       <HeartIcon size={34} />
                     </span>
                     <span className="absolute inset-0 animate-ping rounded-full bg-rose/40 [animation-duration:2.4s] motion-reduce:hidden" />
-                  </span>
+                  </PauseOffscreen>
                   <div>
                     <FeatureLabel icon={Icon.sparkle} dark>
                       A final reveal
@@ -204,7 +204,7 @@ export default function LandingPage() {
               </ul>
             </Reveal>
             <Reveal delay={120}>
-              <SamplePreview templateId="our-story" defaultDevice="desktop" desktopHeight={500} phoneHeight={600} />
+              <SamplePreview templateId="our-story" defaultDevice="desktop" desktopHeight={500} phoneHeight={600} lazy />
             </Reveal>
           </div>
         </section>
