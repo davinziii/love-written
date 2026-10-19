@@ -24,6 +24,8 @@ export interface FieldControlProps {
   label?: string;
   /** "fill": a textarea stretches to the height of its row. "compact": a smaller input for narrow columns. */
   variant?: "fill" | "compact";
+  /** For a choice field with `gridPreview`: the current photo of the field it points at. */
+  previewImage?: string;
 }
 
 const inputClass =
@@ -148,6 +150,7 @@ export function FieldControl(props: FieldControlProps) {
                 {opt.swatch && (
                   <span className="h-6 w-6 shrink-0 rounded-full ring-1 ring-black/15" style={{ background: opt.swatch }} aria-hidden />
                 )}
+                {opt.grid && <GridIcon cols={opt.grid[0]} rows={opt.grid[1]} />}
                 <span className="block min-w-0">
                   <span className="block truncate text-sm font-medium text-ink">{opt.label}</span>
                   {opt.hint && <span className="mt-0.5 block text-[11px] leading-tight text-ink-soft">{opt.hint}</span>}
@@ -215,6 +218,9 @@ export function FieldControl(props: FieldControlProps) {
         </div>
       </div>
       {control}
+      {field.type === "choice" && field.gridPreview && (
+        <GridPreview grid={field.options.find((o) => o.id === (value ?? field.default))?.grid} image={props.previewImage} />
+      )}
       {field.help && (
         <p id={`${id}-help`} className="text-xs text-ink-soft">
           {field.help}
@@ -226,6 +232,56 @@ export function FieldControl(props: FieldControlProps) {
         </p>
       )}
     </div>
+  );
+}
+
+/** A tiny grid (e.g. 5 × 5) beside a choice. */
+function GridIcon({ cols, rows }: { cols: number; rows: number }) {
+  const lines: string[] = [];
+  for (let i = 1; i < cols; i++) lines.push(`M${(i * 24) / cols} 0V24`);
+  for (let i = 1; i < rows; i++) lines.push(`M0 ${(i * 24) / rows}H24`);
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7 shrink-0 rounded-md bg-blush/60 text-rose ring-1 ring-black/10" aria-hidden>
+      <path d={lines.join("")} stroke="currentColor" strokeWidth={0.8} fill="none" />
+    </svg>
+  );
+}
+
+/** Built-in picture used when the photo isn't uploaded yet: a soft heart on blush. */
+const HEART_PICTURE =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="#F8DDE3"/><path d="M200 330C120 270 60 220 60 155c0-45 35-80 78-80 27 0 49 13 62 35 13-22 35-35 62-35 43 0 78 35 78 80 0 65-60 115-140 175z" fill="#E75B73"/></svg>',
+  );
+
+/**
+ * The chosen grid over the photo, so the customer sees how the photo will be cut.
+ * Just an image and one SVG path — it never runs the template itself.
+ */
+function GridPreview({ grid, image }: { grid?: readonly [number, number]; image?: string }) {
+  if (!grid) return null;
+  const [cols, rows] = grid;
+  const lines: string[] = [];
+  for (let i = 1; i < cols; i++) lines.push(`M${(i * 100) / cols} 0V100`);
+  for (let i = 1; i < rows; i++) lines.push(`M0 ${(i * 100) / rows}H100`);
+  return (
+    <figure className="flex items-center gap-4 rounded-2xl bg-white p-3 ring-1 ring-line">
+      <span className="relative block w-28 shrink-0 overflow-hidden rounded-lg ring-1 ring-black/10 sm:w-36">
+        {/* eslint-disable-next-line @next/next/no-img-element -- a local preview / signed URL */}
+        <img src={image || HEART_PICTURE} alt="" className="block h-auto w-full" />
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
+          <path d={lines.join("")} stroke="white" strokeWidth={0.6} vectorEffect="non-scaling-stroke" fill="none" />
+          <path d={lines.join("")} stroke="black" strokeOpacity={0.35} strokeWidth={0.6} strokeDasharray="1.5 1.5" vectorEffect="non-scaling-stroke" fill="none" />
+        </svg>
+      </span>
+      <figcaption className="text-sm text-ink-soft">
+        <span className="block font-display text-2xl text-ink">
+          {cols} × {rows}
+        </span>
+        {cols * rows} pieces per photo
+        {!image && <span className="mt-1 block text-xs">Your first photo will show here.</span>}
+      </figcaption>
+    </figure>
   );
 }
 

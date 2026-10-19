@@ -70,6 +70,8 @@ export interface ChoiceOption {
   hint?: string;
   /** A CSS color shown as a dot beside the label (for color choices). */
   swatch?: string;
+  /** A small grid drawn beside the label: [columns, rows] (for puzzle sizes and the like). */
+  grid?: readonly [number, number];
 }
 
 /** A small look-and-feel switch defined by the template itself (e.g. black & white photos). */
@@ -77,6 +79,11 @@ export interface ChoiceField extends BaseField {
   type: "choice";
   options: readonly ChoiceOption[];
   default: string;
+  /**
+   * A live picture under the dropdown: the chosen option's `grid` drawn over the photo from
+   * `imageField` (or a built-in heart while it's empty). Only for options that have a grid.
+   */
+  gridPreview?: { imageField: string };
 }
 
 export type FieldDef =

@@ -82,6 +82,7 @@ export function GenericEditor({
                   onChange={(v) => onFieldChange(field, v)}
                   onImageSelect={(file) => onImageSelect(field, file)}
                   onImageRemove={() => onImageRemove(field)}
+                  previewImage={field.type === "choice" && field.gridPreview ? images[field.gridPreview.imageField]?.url : undefined}
                 />
               );
               const tile = (field: FieldDef, caption?: string) => (

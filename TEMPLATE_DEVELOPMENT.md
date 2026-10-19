@@ -109,9 +109,13 @@ Available field types (`src/templates/types.ts`):
 | `color` | theme dropdown | `options` (theme ids), `default` | `style` |
 | `font` | font dropdown, each option shown in its font | `options` (font ids), `default`, `previewText` | `style` |
 | `music` | track picker (hidden while the library is empty) | `options` (track ids) | `style` |
-| `choice` | dropdown of the template's own options | `options` (`{ id, label, hint?, swatch? }`), `default` | `style` |
+| `choice` | dropdown of the template's own options | `options` (`{ id, label, hint?, swatch?, grid? }`), `default`, `gridPreview?` | `style` |
 
 Themes, fonts and music tracks are curated in `src/templates/styles.ts`.
+
+A `choice` option can carry `grid: [columns, rows]` (a small grid icon beside it), and the field can set
+`gridPreview: { imageField }` to show the chosen grid drawn over that photo field's current upload, right under
+the dropdown (e.g. **Pieces of Us**' puzzle difficulty). It's only an image and one SVG path — it never runs the template.
 
 > **Never rename a field id** once customers have data for it. If you must change a field
 > incompatibly, bump `schemaVersion`.
