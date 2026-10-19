@@ -72,6 +72,7 @@ src/
     journal/                   Journal (fan of photo pages, hardcover page turn, framed extras, words)
     cd-collection/             CD Collection (a shelf of jewel cases; pull one out to open its memory)
     pixel-heart-hunt/          Pixel Heart Hunt (canvas bow-and-arrow game → 5 photos → letter → endless mode)
+    pieces-of-us/              Pieces of Us (real jigsaw puzzles from 1–3 photos → Polaroids → golden piece → letter)
   components/
     editor/                    GenericEditor + FieldControl (schema-driven, template-agnostic)
     studio/                    customer flow: edit → preview → pay → finalize / failed / scheduled / live

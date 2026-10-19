@@ -33,6 +33,7 @@ const RENDERERS: Record<TemplateId, AnyRenderer> = {
   journal: dynamic(() => import("./journal/JournalRenderer").then((m) => register(m.JournalRenderer))),
   "cd-collection": dynamic(() => import("./cd-collection/CdCollectionRenderer").then((m) => register(m.CdCollectionRenderer))),
   "pixel-heart-hunt": dynamic(() => import("./pixel-heart-hunt/PixelHeartHuntRenderer").then((m) => register(m.PixelHeartHuntRenderer))),
+  "pieces-of-us": dynamic(() => import("./pieces-of-us/PiecesOfUsRenderer").then((m) => register(m.PiecesOfUsRenderer))),
 };
 
 export function TemplateExperience({

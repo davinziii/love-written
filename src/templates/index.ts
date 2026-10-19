@@ -14,6 +14,7 @@ import { loveflixDefinition } from "./loveflix/definition";
 import { journalDefinition } from "./journal/definition";
 import { cdCollectionDefinition } from "./cd-collection/definition";
 import { pixelHeartHuntDefinition } from "./pixel-heart-hunt/definition";
+import { piecesOfUsDefinition } from "./pieces-of-us/definition";
 
 export const TEMPLATES = {
   "our-story": ourStoryDefinition,
@@ -22,6 +23,7 @@ export const TEMPLATES = {
   journal: journalDefinition,
   "cd-collection": cdCollectionDefinition,
   "pixel-heart-hunt": pixelHeartHuntDefinition,
+  "pieces-of-us": piecesOfUsDefinition,
 } as const satisfies Record<string, TemplateDefinition>;
 
 export type TemplateId = keyof typeof TEMPLATES;
