@@ -563,7 +563,13 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
         </div>
       </div>
 
-      <div ref={playRef} className={s.play} data-wide={wide || undefined}>
+      <div
+        ref={playRef}
+        className={s.play}
+        data-wide={wide || undefined}
+        // The board's outer size (with its 7 px paper frame), so the pile can line up with its edges.
+        style={unit ? ({ "--board-w": `${unit * puzzle.w + 14}px`, "--board-h": `${unit * puzzle.h + 14}px` } as CSSProperties) : undefined}
+      >
         <div className={s.boardArea}>
           <div className={`${s.boardWrap} ${solved ? s.solved : ""}`} style={{ "--ratio": `${puzzle.w} / ${puzzle.h}` } as CSSProperties}>
             <svg
