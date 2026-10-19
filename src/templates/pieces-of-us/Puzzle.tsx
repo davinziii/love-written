@@ -1,21 +1,21 @@
 "use client";
 
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { boardSize, cellAt, cutLines, makePuzzle, shuffledOrder, snapRadius, type Piece, type Puzzle as PuzzleGeo } from "./geometry";
+import { boardSize, cellAt, cutLines, makePuzzle, seeded, shuffledOrder, snapRadius, type Piece, type Puzzle as PuzzleGeo } from "./geometry";
 import { DragGesture, boardToClient, clientToBoard, clientToLocal, grabOffset, heldCorner, topLeftForScaled, type Pt, type Rect } from "./drag";
 import type { Sound } from "./sound";
 import s from "./pieces-of-us.module.css";
 
 /**
- * One jigsaw puzzle: the board, the tray of mixed-up pieces, the reference photo, and the
+ * One jigsaw puzzle: the board, the pile of mixed-up pieces, the reference photo, and the
  * drag / tap handling.
  *
  * Rendering: every piece is the same photo clipped by its own jigsaw outline (one image
  * download, reused — the reference photo included). Placed pieces are drawn as ONE image clipped
  * by the union of their outlines, so a finished 8 × 8 board is still a single image on screen.
  *
- * Dragging: a press on a tray piece becomes a drag as soon as it moves a few pixels (no delay),
- * in any direction. The floating copy first appears exactly over the tray piece, held at the
+ * Dragging: a press on a piece in the pile becomes a drag as soon as it moves a few pixels (no delay),
+ * in any direction. The floating copy first appears exactly where it lay in the pile, held at the
  * spot the finger or cursor touched, and grows to board size around that spot. It then follows
  * the pointer through the CSS `translate` property, at most once per frame — no React renders
  * while dragging. All positions come from fresh measurements (see drag.ts), so scrolling,
@@ -85,7 +85,16 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
   const [cursor, setCursor] = useState<number | null>(null);
   const [sparkles, setSparkles] = useState<{ key: number; x: number; y: number }[]>([]);
   const [wide, setWide] = useState(false);
+  /** The pile's stacking order, bottom to top. A piece you pick up or ask a hint for goes on top. */
+  const [stack, setStack] = useState<number[]>(order);
+  /** Bumped by "Spread out" — scatters the pile again. */
+  const [spread, setSpread] = useState(0);
+  /** Screen px per board unit (unzoomed), so pieces in the pile are the same size as on the board. */
+  const [unit, setUnit] = useState(0);
   const solved = placed.size === n * n;
+  const boxW = puzzle.cellW + puzzle.pad * 2;
+  const boxH = puzzle.cellH + puzzle.pad * 2;
+  const raise = useCallback((id: number) => setStack((st) => (st[st.length - 1] === id ? st : [...st.filter((x) => x !== id), id])), []);
 
   const playRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -113,14 +122,19 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
     return () => list.forEach((t) => window.clearTimeout(t));
   }, []);
 
-  // Phone (tray strip below) or wide (tray beside the board).
+  // Phone (pile below the board) or wide (pile beside it).
   useEffect(() => {
     const el = playRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWide(el.offsetWidth >= WIDE_PX));
+    const board = svgRef.current;
+    const ro = new ResizeObserver(() => {
+      setWide(el.offsetWidth >= WIDE_PX);
+      if (board) setUnit(board.clientWidth / puzzle.w);
+    });
     ro.observe(el);
+    if (board) ro.observe(board);
     return () => ro.disconnect();
-  }, []);
+  }, [puzzle.w]);
 
   // ── Coordinates: always measured fresh (never cached) — see drag.ts ──
   const geo = useCallback(() => {
@@ -215,7 +229,7 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
 
   const trayButton = (id: number) => trayRef.current?.querySelector<HTMLElement>(`[data-piece="${id}"]`) ?? null;
 
-  /** Lift a piece out of its tray button: drawn exactly over the button, held at `pointer` (client px). */
+  /** Lift a piece from the pile: drawn exactly over where it lies, held at `pointer` (client px). */
   const liftFrom = (id: number, pointer: Pt) => {
     const btn = trayButton(id);
     if (!btn) return false;
@@ -232,7 +246,7 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
     return true;
   };
 
-  // Right after the floating piece first paints (exactly over its tray button), grow it to board size.
+  // Right after the floating piece first paints (exactly over its spot in the pile), grow it to board size.
   useLayoutEffect(() => {
     const el = ghostRef.current;
     if (!lifted || !el || !gesture.current.dragging) return;
@@ -273,8 +287,9 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
     frame.current = 0;
   };
 
-  /** Send a lifted piece home into its tray button. */
+  /** Send a lifted piece back onto the pile (on top). */
   const returnToTray = async (id: number) => {
+    raise(id); // it lands back on top of the pile
     const btn = trayButton(id);
     const h = held.current;
     if (btn && h) {
@@ -352,7 +367,10 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
         const touch = g.pointerType !== "mouse";
         const result = g.up(e.pointerId, { x: e.clientX, y: e.clientY });
         if (id === null) return;
-        if (result === "tap") setSelected((sel) => (sel === id ? null : id));
+        if (result === "tap") {
+          raise(id);
+          setSelected((sel) => (sel === id ? null : id));
+        }
         else if (result === "drop") endDrag(id, { x: e.clientX, y: e.clientY }, touch);
       },
       cancel: (e) => {
@@ -454,7 +472,7 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
     }
     const btn = trayButton(id);
     if (!btn || reduced.current) return place(id);
-    // Fly the piece from its tray button (held by its middle) to its spot.
+    // Fly the piece from the pile (held by its middle) to its spot.
     const r = btn.getBoundingClientRect();
     if (!liftFrom(id, { x: r.left + r.width / 2, y: r.top + r.height / 2 })) return place(id);
     later(() => void snapInto(id), 30);
@@ -482,23 +500,27 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
       id = order.find((p) => !latest.current.placed.has(p)) ?? null;
       if (id === null) return;
       setSelected(id);
-      trayButton(id)?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: reduced.current ? "auto" : "smooth" });
     }
+    raise(id); // bring it to the top of the pile, so it's never buried
     setHint(id);
     const shown = id;
     later(() => setHint((h) => (h === shown ? null : h)), 1800);
   };
 
-  /** Tray arrows: scroll the tray by most of a screenful (swiping between pieces works too). */
-  const scrollTray = (dir: 1 | -1) => {
-    const t = trayRef.current;
-    if (!t) return;
-    const smooth = reduced.current ? "auto" : "smooth";
-    if (wide) t.scrollBy({ top: dir * t.clientHeight * 0.8, behavior: smooth });
-    else t.scrollBy({ left: dir * t.clientWidth * 0.8, behavior: smooth });
-  };
+  const selectFromKeyboard = useCallback(
+    (pid: number) => {
+      raise(pid);
+      setSelected((sel) => (sel === pid ? null : pid));
+    },
+    [raise],
+  );
 
-  const remaining = order.filter((id) => !placed.has(id));
+  /** "Spread out": scatter the pile again, so buried pieces come to light. */
+  const respread = () => setSpread((v) => v + 1);
+
+  // The pile, bottom to top (later = on top), without the pieces already on the board.
+  const remaining = stack.filter((id) => !placed.has(id));
+  const spots = useMemo(() => scatter(order, seed + spread * 7919), [order, seed, spread]);
   const placedPaths = useMemo(() => [...placed].map((id) => puzzle.pieces[id]!.path), [placed, puzzle]);
   const imgProps = { href: image, x: 0, y: 0, width: puzzle.w, height: puzzle.h, preserveAspectRatio: "xMidYMid slice" } as const;
   const liftedPiece = lifted ? puzzle.pieces[lifted.id]! : null;
@@ -549,7 +571,7 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
               className={s.board}
               viewBox={`0 0 ${puzzle.w} ${puzzle.h}`}
               role="application"
-              aria-label={`Puzzle board, ${n} by ${n}. ${selected !== null ? "A piece is selected: use the arrow keys and Enter to place it." : "Select a piece from the tray first."}`}
+              aria-label={`Puzzle board, ${n} by ${n}. ${selected !== null ? "A piece is selected: use the arrow keys and Enter to place it." : "Select a piece from the pile first."}`}
               tabIndex={0}
               style={{ touchAction: zoomable ? "none" : "manipulation" }}
               onPointerDown={onBoardDown}
@@ -592,35 +614,34 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
         </div>
 
         <div className={s.side}>
-          {/* Wide screens: the clue sits above the tray, beside the board (never over it). */}
+          {/* Wide screens: the clue sits above the pile, beside the board (never over it). */}
           <button type="button" className={s.refCard} onClick={openReference} aria-label="See the whole photo (your little clue)">
             <span className={s.refTape} aria-hidden />
             {reference}
             <span className={s.refLabel}>Your little clue ♡</span>
           </button>
-          <div className={s.trayWrap}>
-            <button type="button" className={`${s.trayArrow} ${s.trayPrev}`} onClick={() => scrollTray(-1)} aria-label="Scroll pieces back" tabIndex={-1}>
-              {wide ? "︿" : "‹"}
-            </button>
-            <div ref={trayRef} className={s.tray} role="listbox" aria-label="Puzzle pieces">
-              {remaining.map((id) => (
-                <TrayPiece
-                  key={id}
-                  piece={puzzle.pieces[id]!}
-                  puzzle={puzzle}
-                  image={image}
-                  clipId={`${uid}-t${id}`}
-                  selected={selected === id}
-                  hidden={lifted?.id === id}
-                  onPointerDown={onTrayDown}
-                  onKeySelect={(pid) => setSelected((sel) => (sel === pid ? null : pid))}
-                />
-              ))}
-              {remaining.length === 0 && <p className={s.trayDone}>All pieces placed ♡</p>}
-            </div>
-            <button type="button" className={`${s.trayArrow} ${s.trayNext}`} onClick={() => scrollTray(1)} aria-label="Scroll pieces forward" tabIndex={-1}>
-              {wide ? "﹀" : "›"}
-            </button>
+          {/* The pieces lie scattered in a pile, overlapping like on a real table — nothing to scroll. */}
+          <div ref={trayRef} className={s.pile} role="listbox" aria-label="Puzzle pieces" style={{ "--unit": `${unit}px`, "--box-w": boxW, "--box-h": boxH } as CSSProperties}>
+            {remaining.map((id) => (
+              <TrayPiece
+                key={id}
+                piece={puzzle.pieces[id]!}
+                puzzle={puzzle}
+                image={image}
+                clipId={`${uid}-t${id}`}
+                spot={spots[id]!}
+                selected={selected === id}
+                hidden={lifted?.id === id}
+                onPointerDown={onTrayDown}
+                onKeySelect={selectFromKeyboard}
+              />
+            ))}
+            {remaining.length === 0 && <p className={s.trayDone}>All pieces placed ♡</p>}
+            {remaining.length > 1 && (
+              <button type="button" className={s.spread} onClick={respread}>
+                <ToolIcon name="spread" /> Spread out
+              </button>
+            )}
           </div>
         </div>
 
@@ -685,12 +706,13 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
   );
 }
 
-/** One piece in the tray. Memoized: picking up or placing one piece doesn't redraw the others. */
+/** One piece in the pile. Memoized: picking up or placing one piece doesn't redraw the others. */
 const TrayPiece = memo(function TrayPiece({
   piece,
   puzzle,
   image,
   clipId,
+  spot,
   selected,
   hidden,
   onPointerDown,
@@ -700,6 +722,8 @@ const TrayPiece = memo(function TrayPiece({
   puzzle: PuzzleGeo;
   image: string;
   clipId: string;
+  /** Where it lies in the pile: 0–1 across the room the pile has for it. */
+  spot: Pt;
   selected: boolean;
   hidden: boolean;
   onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>, id: number) => void;
@@ -714,7 +738,7 @@ const TrayPiece = memo(function TrayPiece({
       aria-label={`Piece ${piece.id + 1}`}
       data-piece={piece.id}
       className={`${s.trayPiece} ${selected ? s.trayPieceOn : ""}`}
-      style={{ visibility: hidden ? "hidden" : undefined, aspectRatio: `${cellW + pad * 2} / ${cellH + pad * 2}` }}
+      style={{ visibility: hidden ? "hidden" : undefined, "--fx": spot.x, "--fy": spot.y } as CSSProperties}
       onPointerDown={(e) => onPointerDown(e, piece.id)}
       onClick={(e) => e.detail === 0 && onKeySelect(piece.id)}
       onContextMenu={(e) => e.preventDefault()}
@@ -726,20 +750,23 @@ const TrayPiece = memo(function TrayPiece({
             <path d={piece.path} />
           </clipPath>
         </defs>
-        <image href={image} x={0} y={0} width={puzzle.w} height={puzzle.h} preserveAspectRatio="xMidYMid slice" clipPath={`url(#${clipId})`} />
+        <path d={piece.path} className={s.pileShadow} />
+        {/* Only the piece's own shape catches the pointer, so you can reach pieces peeking out underneath. */}
+        <image href={image} x={0} y={0} width={puzzle.w} height={puzzle.h} preserveAspectRatio="xMidYMid slice" clipPath={`url(#${clipId})`} className={s.hit} />
         <path d={piece.path} className={s.pieceEdge} />
       </svg>
     </button>
   );
 });
 
-function ToolIcon({ name }: { name: "hint" | "soundOn" | "soundOff" | "restart" | "photos" }) {
+function ToolIcon({ name }: { name: "hint" | "soundOn" | "soundOff" | "restart" | "photos" | "spread" }) {
   const d = {
     hint: "M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1 2V16h5.2v-.2c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z",
     soundOn: "M4 9h4l5-4v14l-5-4H4zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12",
     soundOff: "M4 9h4l5-4v14l-5-4H4zM17 9l5 6M22 9l-5 6",
     restart: "M4 12a8 8 0 1 0 2.4-5.7L4 8.5M4 4v4.5h4.5",
     photos: "M4 7h3l2-2h6l2 2h3v12H4zM12 16.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z",
+    spread: "M4 4h6v6H4zM14 14h6v6h-6zM14 4l6 6M20 4l-6 6M4 14l6 6M10 14l-6 6",
   }[name];
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -762,6 +789,27 @@ function useImageAspect(src: string): number | null {
     };
   }, [src]);
   return state?.src === src ? state.aspect : null;
+}
+
+/**
+ * Scatter positions for the pile, as 0–1 fractions of the room each piece has. A jittered grid,
+ * so pieces overlap like a real pile but every one still peeks out somewhere. Seeded: stable
+ * between renders, different after "Spread out".
+ */
+function scatter(order: readonly number[], seed: number): Pt[] {
+  const rand = seeded(seed);
+  const count = order.length;
+  const cols = Math.max(1, Math.ceil(Math.sqrt(count * 1.6)));
+  const rows = Math.max(1, Math.ceil(count / cols));
+  const out: Pt[] = [];
+  order.forEach((id, i) => {
+    const c = i % cols;
+    const r = Math.floor(i / cols);
+    const jx = (rand() - 0.5) * 0.9;
+    const jy = (rand() - 0.5) * 0.9;
+    out[id] = { x: clamp((c + 0.5 + jx) / cols, 0, 1), y: clamp((r + 0.5 + jy) / rows, 0, 1) };
+  });
+  return out;
 }
 
 function clamp(v: number, lo: number, hi: number) {
