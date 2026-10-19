@@ -1,37 +1,42 @@
 "use client";
 
-import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { boardSize, cellAt, cutLines, makePuzzle, shuffledOrder, snapRadius, type Piece, type Puzzle as PuzzleGeo } from "./geometry";
+import { DragGesture, boardToClient, clientToBoard, clientToLocal, grabOffset, heldCorner, topLeftForScaled, type Pt, type Rect } from "./drag";
 import type { Sound } from "./sound";
 import s from "./pieces-of-us.module.css";
 
 /**
- * One jigsaw puzzle: the board, the tray of mixed-up pieces, and the drag / tap handling.
+ * One jigsaw puzzle: the board, the tray of mixed-up pieces, the reference photo, and the
+ * drag / tap handling.
  *
  * Rendering: every piece is the same photo clipped by its own jigsaw outline (one image
- * download, reused). Placed pieces are drawn as ONE image clipped by the union of their
- * outlines, so a finished 8 × 8 board is still a single image on screen.
+ * download, reused — the reference photo included). Placed pieces are drawn as ONE image clipped
+ * by the union of their outlines, so a finished 8 × 8 board is still a single image on screen.
  *
- * Dragging never re-renders React: the floating piece is moved by writing its transform
- * directly. React only updates when a piece is picked up, placed, or returned.
+ * Dragging: a press on a tray piece becomes a drag as soon as it moves a few pixels (no delay),
+ * in any direction. The floating copy first appears exactly over the tray piece, held at the
+ * spot the finger or cursor touched, and grows to board size around that spot. It then follows
+ * the pointer through the CSS `translate` property, at most once per frame — no React renders
+ * while dragging. All positions come from fresh measurements (see drag.ts), so scrolling,
+ * zooming, panning, resizing and rotating can't throw a piece somewhere else.
  */
 
-const LIFT_PX = 18;
+/** How much a held piece grows to look "picked up" (it scales around the grab point). */
+const LIFT_SCALE = 1.06;
 const ZOOM_MAX = 2.6;
 const WIDE_PX = 720; // same as the @container rule in the CSS
 
-type Pt = { x: number; y: number };
-type Drag = {
+/** The floating piece: its full-size box in local px, where it's held, and how it first appears. */
+type Lifted = {
   id: number;
-  pointerId: number;
-  touch: boolean;
-  start: Pt;
-  last: Pt;
-  /** Pointer position minus the piece's top-left corner, in screen px. */
+  w: number;
+  h: number;
+  /** Grab point inside the full-size box (local px) — also the scale origin. */
   grab: Pt;
-  dragging: boolean;
-  /** Where the piece came from (a tray button), to fly back to. */
-  from: HTMLElement;
+  /** Box top-left (local px) and scale for the very first paint, so it never flashes elsewhere. */
+  at: Pt;
+  scale: number;
 };
 
 export type PuzzleProps = {
@@ -73,8 +78,8 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
 
   const [placed, setPlaced] = useState<ReadonlySet<number>>(() => new Set());
   const [selected, setSelected] = useState<number | null>(null);
-  /** The piece floating above the board, and its size in the play area's CSS px. */
-  const [lifted, setLifted] = useState<{ id: number; w: number; h: number } | null>(null);
+  const [lifted, setLifted] = useState<Lifted | null>(null);
+  const [refOpen, setRefOpen] = useState(false);
   const [hint, setHint] = useState<number | null>(null);
   const [settled, setSettled] = useState<number | null>(null);
   const [cursor, setCursor] = useState<number | null>(null);
@@ -88,7 +93,10 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
   const ghostRef = useRef<HTMLDivElement>(null);
   const trayRef = useRef<HTMLDivElement>(null);
   const view = useRef({ zoom: 1, x: 0, y: 0 });
-  const drag = useRef<Drag | null>(null);
+  const gesture = useRef(new DragGesture());
+  /** The drag in progress: grab offset and knob room in client px (full size), and client px per local px. */
+  const held = useRef<{ grab: Pt; pad: number; k: number; boxW: number } | null>(null);
+  const frame = useRef(0);
   const timers = useRef<number[]>([]);
   const reduced = useRef(false);
   const latest = useRef({ placed, selected, solved, soundOn });
@@ -105,7 +113,7 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
     return () => list.forEach((t) => window.clearTimeout(t));
   }, []);
 
-  // Phone (tray strip below) or wide (tray beside the board) — decides how a tray swipe is read.
+  // Phone (tray strip below) or wide (tray beside the board).
   useEffect(() => {
     const el = playRef.current;
     if (!el) return;
@@ -114,24 +122,22 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
     return () => ro.disconnect();
   }, []);
 
-  // ── Coordinates: screen ↔ board (works with zoom, pan, and a scaled preview frame) ──
+  // ── Coordinates: always measured fresh (never cached) — see drag.ts ──
   const geo = useCallback(() => {
-    const r = svgRef.current!.getBoundingClientRect();
-    const v = view.current;
-    const k = r.width / puzzle.w; // screen px per board unit, before zoom
+    const r: Rect = svgRef.current!.getBoundingClientRect();
+    const v = { ...view.current };
     return {
-      scale: k * v.zoom,
-      toBoard: (p: Pt): Pt => ({ x: ((p.x - r.left) / k - v.x) / v.zoom, y: ((p.y - r.top) / k - v.y) / v.zoom }),
-      toScreen: (p: Pt): Pt => ({ x: r.left + (p.x * v.zoom + v.x) * k, y: r.top + (p.y * v.zoom + v.y) * k }),
+      scale: (r.width / puzzle.w) * v.zoom, // client px per board unit
+      toBoard: (p: Pt) => clientToBoard(p, r, puzzle.w, v),
+      toScreen: (p: Pt) => boardToClient(p, r, puzzle.w, v),
     };
   }, [puzzle.w]);
 
-  /** Screen → the play area's own CSS pixels (the preview frame may be scaled). */
+  /** Client → the play area's own CSS pixels (the editor preview shrinks it with a transform). */
   const toLocal = useCallback((p: Pt): Pt & { k: number } => {
     const el = playRef.current!;
     const r = el.getBoundingClientRect();
-    const k = r.width / el.offsetWidth || 1;
-    return { x: (p.x - r.left) / k, y: (p.y - r.top) / k, k };
+    return { ...clientToLocal(p, r, el.offsetWidth), k: r.width / el.offsetWidth || 1 };
   }, []);
 
   const applyView = () => {
@@ -181,151 +187,231 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
   }, [solved, onSolved, sound]);
 
   // ── The floating piece ──
-  /** Lift a piece: the floating copy is drawn at the board's current on-screen size. */
-  const lift = (id: number) => {
-    const scale = geo().scale;
-    const k = toLocal({ x: 0, y: 0 }).k;
-    setLifted({ id, w: ((puzzle.cellW + puzzle.pad * 2) * scale) / k, h: ((puzzle.cellH + puzzle.pad * 2) * scale) / k });
-  };
-  /** Put the floating piece's top-left corner (the cell corner, not the knob) at a screen point. */
-  const moveGhost = (corner: Pt) => {
+  const setGhost = (at: Pt, scale?: number) => {
     const el = ghostRef.current;
     if (!el) return;
-    const { x, y, k } = toLocal(corner);
-    const pad = (puzzle.pad * geo().scale) / k;
-    el.style.transform = `translate(${x - pad}px, ${y - pad}px)`;
+    el.style.translate = `${at.x}px ${at.y}px`;
+    if (scale !== undefined) el.style.scale = String(scale);
   };
 
-  const flyGhost = (to: Pt, scaleTo: number, ms: number) => {
+  /** Animate the floating piece's box to a position / scale; resolves even if the page isn't drawing. */
+  const flyGhost = (at: Pt, scale: number, ms: number) => {
     const el = ghostRef.current;
     if (!el) return Promise.resolve();
-    const { x, y, k } = toLocal(to);
-    const pad = (puzzle.pad * geo().scale) / k;
-    const target = `translate(${x - pad * scaleTo}px, ${y - pad * scaleTo}px) scale(${scaleTo})`;
+    const from = { translate: el.style.translate || "0px 0px", scale: el.style.scale || "1" };
+    const to = { translate: `${at.x}px ${at.y}px`, scale: String(scale) };
+    el.style.transition = "none";
     if (reduced.current || !el.animate) {
-      el.style.transform = target;
+      setGhost(at, scale);
       return Promise.resolve();
     }
-    const anim = el.animate([{ transform: el.style.transform }, { transform: target }], { duration: ms, easing: "cubic-bezier(.2,.8,.2,1)", fill: "forwards" });
-    // A page that isn't being drawn (background tab) may never finish the animation: don't wait forever.
+    const anim = el.animate([from, to], { duration: ms, easing: "cubic-bezier(.2,.8,.2,1)", fill: "forwards" });
     const timeout = new Promise<void>((done) => window.setTimeout(done, ms + 120));
     return Promise.race([anim.finished.then(() => undefined, () => undefined), timeout]).then(() => {
-      el.style.transform = target;
+      setGhost(at, scale);
       anim.cancel();
     });
   };
 
   const trayButton = (id: number) => trayRef.current?.querySelector<HTMLElement>(`[data-piece="${id}"]`) ?? null;
 
-  /** Send a lifted piece home to the tray. */
+  /** Lift a piece out of its tray button: drawn exactly over the button, held at `pointer` (client px). */
+  const liftFrom = (id: number, pointer: Pt) => {
+    const btn = trayButton(id);
+    if (!btn) return false;
+    const r = btn.getBoundingClientRect();
+    const g = geo();
+    const local = toLocal(pointer);
+    const k = local.k;
+    const boxW = (puzzle.cellW + puzzle.pad * 2) * g.scale; // full-size box, client px
+    const boxH = (puzzle.cellH + puzzle.pad * 2) * g.scale;
+    const grab = grabOffset(pointer, r, boxW);
+    held.current = { grab, pad: puzzle.pad * g.scale, k, boxW };
+    const grabLocal = { x: grab.x / k, y: grab.y / k };
+    setLifted({ id, w: boxW / k, h: boxH / k, grab: grabLocal, at: { x: local.x - grabLocal.x, y: local.y - grabLocal.y }, scale: r.width / boxW });
+    return true;
+  };
+
+  // Right after the floating piece first paints (exactly over its tray button), grow it to board size.
+  useLayoutEffect(() => {
+    const el = ghostRef.current;
+    if (!lifted || !el || !gesture.current.dragging) return;
+    el.style.transition = reduced.current ? "none" : "scale .14s ease-out";
+    const raf = requestAnimationFrame(() => {
+      el.style.scale = String(LIFT_SCALE);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [lifted]);
+
+  const moveToPointer = () => {
+    const h = held.current;
+    if (!h || !gesture.current.dragging) return;
+    const local = toLocal(gesture.current.last);
+    setGhost({ x: local.x - h.grab.x / h.k, y: local.y - h.grab.y / h.k });
+  };
+  /**
+   * Follow the pointer — at most once per frame. If the browser is holding frames back
+   * (power saving, a busy page), don't let the piece freeze: after 100 ms move it anyway.
+   */
+  const frameAsked = useRef(0);
+  const follow = () => {
+    if (frame.current) {
+      if (performance.now() - frameAsked.current > 100) {
+        frameAsked.current = performance.now();
+        moveToPointer();
+      }
+      return;
+    }
+    frameAsked.current = performance.now();
+    frame.current = requestAnimationFrame(() => {
+      frame.current = 0;
+      moveToPointer();
+    });
+  };
+  const stopFollowing = () => {
+    cancelAnimationFrame(frame.current);
+    frame.current = 0;
+  };
+
+  /** Send a lifted piece home into its tray button. */
   const returnToTray = async (id: number) => {
     const btn = trayButton(id);
-    if (btn) {
+    const h = held.current;
+    if (btn && h) {
       const r = btn.getBoundingClientRect();
-      const g = geo();
-      const full = (puzzle.cellW + puzzle.pad * 2) * g.scale;
-      const k = r.width / full;
-      // The tray button shows the whole piece (with its knob room), so line up the corners.
-      await flyGhost({ x: r.left + puzzle.pad * g.scale * k, y: r.top + puzzle.pad * g.scale * k }, k, 220);
+      const local = toLocal({ x: r.left, y: r.top });
+      const scale = r.width / h.boxW;
+      await flyGhost(topLeftForScaled(local, { x: h.grab.x / h.k, y: h.grab.y / h.k }, scale), scale, 220);
     }
+    held.current = null;
     setLifted(null);
   };
 
+  /** Fly a lifted piece into its exact spot on the board, then lock it there. */
   const snapInto = async (id: number) => {
-    const piece = puzzle.pieces[id]!;
-    await flyGhost(geo().toScreen({ x: piece.x, y: piece.y }), 1, 140);
+    const h = held.current;
+    if (h) {
+      const piece = puzzle.pieces[id]!;
+      const corner = toLocal(geo().toScreen({ x: piece.x, y: piece.y }));
+      const box = { x: corner.x - h.pad / h.k, y: corner.y - h.pad / h.k };
+      await flyGhost(topLeftForScaled(box, { x: h.grab.x / h.k, y: h.grab.y / h.k }, 1), 1, 140);
+    }
     place(id);
+    held.current = null;
     setLifted(null);
   };
 
-  // ── Tray: tap to select, pull out to drag ──
-  const onTrayDown = (e: ReactPointerEvent<HTMLButtonElement>, id: number) => {
-    if (latest.current.solved || drag.current || e.button > 0) return;
+  /** Finish a drag: snap if the piece is near its spot, otherwise send it home. No pointer = send it home. */
+  const endDrag = (id: number, pointer: Pt | null, touch: boolean) => {
+    stopFollowing();
+    const h = held.current;
+    if (!h || !pointer) return void returnToTray(id);
     const g = geo();
-    const touch = e.pointerType === "touch";
-    // Hold the piece by its middle — on touch a little above the finger so it stays visible.
-    const grab = {
-      x: (puzzle.cellW / 2) * g.scale,
-      y: (puzzle.cellH / 2) * g.scale + (touch ? (puzzle.cellH / 2) * g.scale + LIFT_PX : 0),
-    };
-    drag.current = { id, pointerId: e.pointerId, touch, start: { x: e.clientX, y: e.clientY }, last: { x: e.clientX, y: e.clientY }, grab, dragging: false, from: e.currentTarget };
+    const corner = g.toBoard(heldCorner(pointer, h.grab, h.pad, LIFT_SCALE));
+    const piece = puzzle.pieces[id]!;
+    const near = Math.hypot(corner.x - piece.x, corner.y - piece.y) <= snapRadius(puzzle, g.scale, touch);
+    void (near ? snapInto(id) : returnToTray(id));
   };
 
+  // ── Tray: tap to select, drag (any direction) to move ──
+  const onTrayDown = (e: ReactPointerEvent<HTMLButtonElement>, id: number) => {
+    const g = gesture.current;
+    // A piece still flying home or into place finishes first (a fraction of a second).
+    if (latest.current.solved || e.button > 0 || refOpen || (lifted && !g.active)) return;
+    if (g.active && g.dragging) {
+      // The last drag never got its release (lost pointer): drop that floating piece right away.
+      stopFollowing();
+      held.current = null;
+      setLifted(null);
+    }
+    g.down(e.pointerId, id, e.pointerType, { x: e.clientX, y: e.clientY });
+    capture(e.currentTarget, e.pointerId);
+  };
+
+  // Window listeners are attached once and call the latest handlers through a ref (no stale closures).
+  const handlers = useRef({ move: (e: PointerEvent) => void e, up: (e: PointerEvent) => void e, cancel: (e: PointerEvent) => void e });
   useEffect(() => {
-    const move = (e: PointerEvent) => {
-      const d = drag.current;
-      if (!d || e.pointerId !== d.pointerId) return;
-      d.last = { x: e.clientX, y: e.clientY };
-      if (!d.dragging) {
-        const dx = Math.abs(e.clientX - d.start.x);
-        const dy = Math.abs(e.clientY - d.start.y);
-        // Touch: a swipe along the tray scrolls it; pulling a piece out of the tray lifts it.
-        const pulled = d.touch ? (wide ? dx > 8 && dx > dy : dy > 8 && dy > dx) : Math.hypot(dx, dy) > 5;
-        if (!pulled) return;
-        d.dragging = true;
-        lift(d.id);
-        setSelected(null);
-        if (latest.current.soundOn) sound?.wake();
-      }
-      e.preventDefault();
-      moveGhost({ x: e.clientX - d.grab.x, y: e.clientY - d.grab.y });
+    handlers.current = {
+      move: (e) => {
+        const g = gesture.current;
+        const id = g.pieceId;
+        const result = g.move(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (id === null || result === "ignore" || result === "pending") return;
+        if (result === "start") {
+          // Lift it from where the press began, so the piece doesn't lag behind the slop distance.
+          if (!liftFrom(id, g.start)) return void g.cancel();
+          setSelected(null);
+          if (latest.current.soundOn) sound?.wake();
+        }
+        if (e.cancelable) e.preventDefault();
+        follow();
+      },
+      up: (e) => {
+        const g = gesture.current;
+        const id = g.pieceId;
+        const touch = g.pointerType !== "mouse";
+        const result = g.up(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (id === null) return;
+        if (result === "tap") setSelected((sel) => (sel === id ? null : id));
+        else if (result === "drop") endDrag(id, { x: e.clientX, y: e.clientY }, touch);
+      },
+      cancel: (e) => {
+        const g = gesture.current;
+        const id = g.pieceId;
+        if (g.cancel(e.pointerId) === "cancel-drag" && id !== null) endDrag(id, null, false);
+      },
     };
-    const up = (e: PointerEvent) => {
-      const d = drag.current;
-      if (!d || e.pointerId !== d.pointerId) return;
-      drag.current = null;
-      if (!d.dragging) {
-        // A tap: select (or unselect) this piece.
-        setSelected((sel) => (sel === d.id ? null : d.id));
-        return;
-      }
-      const g = geo();
-      const corner = g.toBoard({ x: d.last.x - d.grab.x, y: d.last.y - d.grab.y });
-      const piece = puzzle.pieces[d.id]!;
-      const near = Math.hypot(corner.x - piece.x, corner.y - piece.y) <= snapRadius(puzzle, g.scale, d.touch);
-      void (near ? snapInto(d.id) : returnToTray(d.id));
-    };
-    const cancel = (e: PointerEvent) => {
-      const d = drag.current;
-      if (!d || e.pointerId !== d.pointerId) return;
-      drag.current = null;
-      if (d.dragging) void returnToTray(d.id);
-    };
+  });
+  useEffect(() => {
+    const move = (e: PointerEvent) => handlers.current.move(e);
+    const up = (e: PointerEvent) => handlers.current.up(e);
+    const cancel = (e: PointerEvent) => handlers.current.cancel(e);
     window.addEventListener("pointermove", move, { passive: false });
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", cancel);
+    const pending = frame;
     return () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", cancel);
+      cancelAnimationFrame(pending.current);
     };
-  });
+  }, []);
 
-  // Once the floating piece exists, put it under the finger right away.
+  // ── Reference photo ──
+  const openReference = () => {
+    // Opening it mid-drag (keyboard, a second finger) safely sends the held piece home first.
+    const g = gesture.current;
+    const id = g.pieceId;
+    if (g.cancel() === "cancel-drag" && id !== null) endDrag(id, null, false);
+    setRefOpen(true);
+  };
   useEffect(() => {
-    const d = drag.current;
-    if (lifted && d?.dragging) moveGhost({ x: d.last.x - d.grab.x, y: d.last.y - d.grab.y });
-  });
+    if (!refOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setRefOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [refOpen]);
 
   // ── Board: tap a spot for the selected piece; pinch / drag to zoom and pan (7 × 7 and up) ──
   const zoomable = n >= 7;
   const pointers = useRef(new Map<number, Pt>());
-  const gesture = useRef<{ moved: boolean; pinch: { dist: number; zoom: number } | null; start: Pt } | null>(null);
+  const boardGesture = useRef<{ moved: boolean; pinch: { dist: number; zoom: number } | null; start: Pt } | null>(null);
 
   const onBoardDown = (e: ReactPointerEvent<SVGSVGElement>) => {
-    if (drag.current) return;
+    if (gesture.current.dragging) return;
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     capture(e.currentTarget, e.pointerId);
-    if (pointers.current.size === 1) gesture.current = { moved: false, pinch: null, start: { x: e.clientX, y: e.clientY } };
-    else if (pointers.current.size === 2 && zoomable && gesture.current) {
+    if (pointers.current.size === 1) boardGesture.current = { moved: false, pinch: null, start: { x: e.clientX, y: e.clientY } };
+    else if (pointers.current.size === 2 && zoomable && boardGesture.current) {
       const [a, b] = [...pointers.current.values()] as [Pt, Pt];
-      gesture.current.pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: view.current.zoom };
-      gesture.current.moved = true;
+      boardGesture.current.pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: view.current.zoom };
+      boardGesture.current.moved = true;
     }
   };
   const onBoardMove = (e: ReactPointerEvent<SVGSVGElement>) => {
     const prev = pointers.current.get(e.pointerId);
-    const g = gesture.current;
+    const g = boardGesture.current;
     if (!prev || !g) return;
     const now = { x: e.clientX, y: e.clientY };
     pointers.current.set(e.pointerId, now);
@@ -349,9 +435,9 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
   };
   const onBoardUp = (e: ReactPointerEvent<SVGSVGElement>) => {
     pointers.current.delete(e.pointerId);
-    const g = gesture.current;
+    const g = boardGesture.current;
     if (pointers.current.size > 0) return;
-    gesture.current = null;
+    boardGesture.current = null;
     if (!g || g.moved || e.type === "pointercancel") return;
     const p = geo().toBoard({ x: e.clientX, y: e.clientY });
     tryPlaceAt(cellAt(puzzle, p.x, p.y));
@@ -360,7 +446,7 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
   /** Tap-to-place / keyboard: put the selected piece in a cell — only if it's its own cell. */
   const tryPlaceAt = (cell: number | null) => {
     const id = latest.current.selected;
-    if (id === null || cell === null || latest.current.placed.has(cell)) return;
+    if (id === null || cell === null || latest.current.placed.has(cell) || lifted) return;
     if (cell !== id) {
       // Not its spot: a little shake, the piece stays selected.
       if (!reduced.current) svgRef.current?.animate?.([{ transform: "translateX(0)" }, { transform: "translateX(-6px)" }, { transform: "translateX(6px)" }, { transform: "translateX(0)" }], { duration: 260 });
@@ -368,18 +454,10 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
     }
     const btn = trayButton(id);
     if (!btn || reduced.current) return place(id);
-    // Fly the piece from the tray to its spot.
+    // Fly the piece from its tray button (held by its middle) to its spot.
     const r = btn.getBoundingClientRect();
-    const g = geo();
-    const k = r.width / ((puzzle.cellW + puzzle.pad * 2) * g.scale);
-    lift(id);
-    later(() => {
-      const el = ghostRef.current;
-      if (!el) return;
-      const { x, y } = toLocal({ x: r.left, y: r.top });
-      el.style.transform = `translate(${x}px, ${y}px) scale(${k})`;
-      void snapInto(id);
-    }, 0);
+    if (!liftFrom(id, { x: r.left + r.width / 2, y: r.top + r.height / 2 })) return place(id);
+    later(() => void snapInto(id), 30);
   };
 
   const onBoardKey = (e: ReactKeyboardEvent<SVGSVGElement>) => {
@@ -411,14 +489,32 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
     later(() => setHint((h) => (h === shown ? null : h)), 1800);
   };
 
+  /** Tray arrows: scroll the tray by most of a screenful (swiping between pieces works too). */
+  const scrollTray = (dir: 1 | -1) => {
+    const t = trayRef.current;
+    if (!t) return;
+    const smooth = reduced.current ? "auto" : "smooth";
+    if (wide) t.scrollBy({ top: dir * t.clientHeight * 0.8, behavior: smooth });
+    else t.scrollBy({ left: dir * t.clientWidth * 0.8, behavior: smooth });
+  };
+
   const remaining = order.filter((id) => !placed.has(id));
   const placedPaths = useMemo(() => [...placed].map((id) => puzzle.pieces[id]!.path), [placed, puzzle]);
   const imgProps = { href: image, x: 0, y: 0, width: puzzle.w, height: puzzle.h, preserveAspectRatio: "xMidYMid slice" } as const;
   const liftedPiece = lifted ? puzzle.pieces[lifted.id]! : null;
+  /** The photo exactly as the puzzle cuts it (same crop, same image). */
+  const reference = (
+    <svg viewBox={`0 0 ${puzzle.w} ${puzzle.h}`} className={s.refImage} aria-hidden>
+      <image {...imgProps} />
+    </svg>
+  );
 
   return (
     <div className={s.puzzle}>
       <div className={s.toolbar}>
+        <button type="button" className={s.refMini} onClick={openReference} aria-label="See the whole photo (your little clue)">
+          {reference}
+        </button>
         <div className={s.toolbarInfo}>
           <p className={s.memoryNo}>
             Memory {index + 1} <span>of {total}</span>
@@ -495,34 +591,60 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
           )}
         </div>
 
-        <div ref={trayRef} className={s.tray} role="listbox" aria-label="Puzzle pieces" style={{ touchAction: wide ? "pan-y" : "pan-x" }}>
-          {remaining.map((id) => (
-            <TrayPiece
-              key={id}
-              piece={puzzle.pieces[id]!}
-              puzzle={puzzle}
-              image={image}
-              clipId={`${uid}-t${id}`}
-              selected={selected === id}
-              hidden={lifted?.id === id}
-              onPointerDown={onTrayDown}
-              onKeySelect={(pid) => setSelected((sel) => (sel === pid ? null : pid))}
-            />
-          ))}
-          {remaining.length === 0 && <p className={s.trayDone}>All pieces placed ♡</p>}
+        <div className={s.side}>
+          {/* Wide screens: the clue sits above the tray, beside the board (never over it). */}
+          <button type="button" className={s.refCard} onClick={openReference} aria-label="See the whole photo (your little clue)">
+            <span className={s.refTape} aria-hidden />
+            {reference}
+            <span className={s.refLabel}>Your little clue ♡</span>
+          </button>
+          <div className={s.trayWrap}>
+            <button type="button" className={`${s.trayArrow} ${s.trayPrev}`} onClick={() => scrollTray(-1)} aria-label="Scroll pieces back" tabIndex={-1}>
+              {wide ? "︿" : "‹"}
+            </button>
+            <div ref={trayRef} className={s.tray} role="listbox" aria-label="Puzzle pieces">
+              {remaining.map((id) => (
+                <TrayPiece
+                  key={id}
+                  piece={puzzle.pieces[id]!}
+                  puzzle={puzzle}
+                  image={image}
+                  clipId={`${uid}-t${id}`}
+                  selected={selected === id}
+                  hidden={lifted?.id === id}
+                  onPointerDown={onTrayDown}
+                  onKeySelect={(pid) => setSelected((sel) => (sel === pid ? null : pid))}
+                />
+              ))}
+              {remaining.length === 0 && <p className={s.trayDone}>All pieces placed ♡</p>}
+            </div>
+            <button type="button" className={`${s.trayArrow} ${s.trayNext}`} onClick={() => scrollTray(1)} aria-label="Scroll pieces forward" tabIndex={-1}>
+              {wide ? "﹀" : "›"}
+            </button>
+          </div>
         </div>
 
-        {selected !== null && !solved && (
-          <p className={s.selectedHint}>
-            Now tap its spot on the board ·{" "}
-            <button type="button" onClick={() => setSelected(null)}>
-              Cancel
-            </button>
-          </p>
-        )}
+        {/* Always laid out (hidden when nothing is selected), so the board never shifts mid-drag. */}
+        <p className={s.selectedHint} style={selected !== null && !solved ? undefined : { visibility: "hidden" }} aria-hidden={selected === null || solved}>
+          Now tap its spot on the board ·{" "}
+          <button type="button" onClick={() => setSelected(null)} tabIndex={selected === null ? -1 : undefined}>
+            Cancel
+          </button>
+        </p>
 
         {liftedPiece && lifted && (
-          <div ref={ghostRef} className={s.ghost} style={{ width: lifted.w, height: lifted.h }} aria-hidden>
+          <div
+            ref={ghostRef}
+            className={s.ghost}
+            style={{
+              width: lifted.w,
+              height: lifted.h,
+              transformOrigin: `${lifted.grab.x}px ${lifted.grab.y}px`,
+              translate: `${lifted.at.x}px ${lifted.at.y}px`,
+              scale: String(lifted.scale),
+            }}
+            aria-hidden
+          >
             <svg viewBox={`${liftedPiece.x - puzzle.pad} ${liftedPiece.y - puzzle.pad} ${puzzle.cellW + puzzle.pad * 2} ${puzzle.cellH + puzzle.pad * 2}`} width="100%" height="100%">
               <defs>
                 <clipPath id={`${uid}-ghost`}>
@@ -546,6 +668,19 @@ function Board({ index, total, image, n, sound, soundOn, canShowMemories, onTogg
           </span>
         ))}
       </div>
+
+      {refOpen && (
+        <div className={s.refOverlay} role="dialog" aria-modal="true" aria-label="Your little clue: the whole photo" onClick={() => setRefOpen(false)}>
+          <figure className={s.refBig} onClick={(e) => e.stopPropagation()} style={{ "--ratio": `${puzzle.w} / ${puzzle.h}` } as CSSProperties}>
+            <span className={s.refTape} aria-hidden />
+            {reference}
+            <figcaption className={s.refLabel}>Your little clue ♡</figcaption>
+          </figure>
+          <button type="button" className={s.refClose} onClick={() => setRefOpen(false)} autoFocus>
+            Close ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -583,6 +718,7 @@ const TrayPiece = memo(function TrayPiece({
       onPointerDown={(e) => onPointerDown(e, piece.id)}
       onClick={(e) => e.detail === 0 && onKeySelect(piece.id)}
       onContextMenu={(e) => e.preventDefault()}
+      onDragStart={(e) => e.preventDefault()}
     >
       <svg viewBox={`${piece.x - pad} ${piece.y - pad} ${cellW + pad * 2} ${cellH + pad * 2}`} width="100%" height="100%" aria-hidden>
         <defs>

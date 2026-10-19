@@ -238,17 +238,19 @@
 .toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
   padding: 12px 14px 8px;
   flex: none;
 }
 .toolbarInfo {
+  flex: 1;
   min-width: 0;
 }
 .memoryNo {
   margin: 0;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--display);
   font-size: 19px;
   font-weight: 600;
@@ -261,6 +263,7 @@
 }
 .counter {
   margin: 3px 0 0;
+  white-space: nowrap;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   color: var(--accent-deep);
@@ -286,9 +289,30 @@
   cursor: pointer;
   box-shadow: 0 2px 6px -3px rgb(60 30 40 / 0.35);
 }
-@media (max-width: 359px) {
+@media (max-width: 419px) {
   .toolLabel {
     display: none;
+  }
+}
+@media (max-width: 359px) {
+  .toolbar {
+    gap: 8px;
+    padding-inline: 10px;
+  }
+  .toolButtons {
+    gap: 4px;
+  }
+  .tool {
+    min-width: 32px;
+    height: 34px;
+    padding: 0 5px;
+  }
+  .toolbar .refMini {
+    width: 36px;
+    padding: 2px 2px 7px;
+  }
+  .memoryNo {
+    font-size: 16px;
   }
 }
 .tool:disabled {
@@ -302,27 +326,202 @@
   min-height: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr);
 }
+/* The side: the clue card (wide screens only) and the tray. */
+.side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.trayWrap {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+.trayArrow {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  color: var(--accent-deep);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+/* Phones: arrows at the ends of the strip. */
+.trayPrev,
+.trayNext {
+  top: 0;
+  bottom: 0;
+  width: 26px;
+}
+.trayPrev {
+  left: 0;
+  box-shadow: 6px 0 8px -6px rgb(60 30 40 / 0.25);
+}
+.trayNext {
+  right: 0;
+  box-shadow: -6px 0 8px -6px rgb(60 30 40 / 0.25);
+}
+
+/* The reference photo ("your little clue"), on a miniature Polaroid. */
+.refImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--desk);
+}
+.refMini {
+  flex: none;
+  width: 44px;
+  padding: 3px 3px 9px;
+  border: 0;
+  border-radius: 2px;
+  background: #fffdf8;
+  cursor: zoom-in;
+  transform: rotate(-4deg);
+  box-shadow: 0 3px 8px -3px rgb(60 30 40 / 0.45);
+}
+.refCard {
+  display: none;
+  position: relative;
+  align-self: center;
+  width: 62%;
+  margin: 10px auto 14px;
+  padding: 8px 8px 4px;
+  border: 0;
+  border-radius: 3px;
+  background: #fffdf8;
+  cursor: zoom-in;
+  transform: rotate(2deg);
+  box-shadow: 0 10px 18px -12px rgb(60 30 40 / 0.55);
+  flex: none;
+}
+.refTape {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  width: 40%;
+  height: 16px;
+  margin-left: -20%;
+  background: color-mix(in srgb, var(--tape) 85%, transparent);
+  transform: rotate(-3deg);
+}
+.refLabel {
+  display: block;
+  padding: 6px 2px 2px;
+  font-family: var(--hand);
+  font-size: 18px;
+  line-height: 1.1;
+  color: var(--accent-deep);
+  text-align: center;
+}
+.refOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px 18px;
+  background: color-mix(in srgb, var(--ink) 45%, transparent);
+  animation: fade 0.18s ease both;
+  cursor: zoom-out;
+}
+.refBig {
+  position: relative;
+  margin: 0;
+  width: min(100%, 520px);
+  max-width: calc((var(--screen-h) - 170px) * var(--ratio));
+  padding: 12px 12px 6px;
+  background: #fffdf8;
+  border-radius: 3px;
+  box-shadow: 0 24px 40px -20px rgb(0 0 0 / 0.55);
+  transform: rotate(-1deg);
+  cursor: default;
+  animation: develop 0.3s ease-out both;
+  --tilt: -1deg;
+}
+.refBig .refLabel {
+  font-size: 22px;
+}
+.refClose {
+  min-height: 44px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--paper);
+  font-weight: 700;
+  cursor: pointer;
+}
+
 @container (min-width: 720px) {
   .play {
     grid-template-rows: minmax(0, 1fr) auto;
     grid-template-columns: minmax(0, 1fr) clamp(240px, 26vw, 320px);
   }
-  .tray {
+  .side {
     grid-row: 1 / span 2;
     grid-column: 2;
+    padding-top: 8px;
+  }
+  .refMini {
+    display: none;
+  }
+  .refCard {
+    display: block;
+  }
+  .trayWrap {
+    flex: 1;
+    display: flex;
+  }
+  .tray {
+    flex: 1;
     flex-wrap: wrap !important;
     align-content: flex-start;
     overflow: hidden auto !important;
     height: auto !important;
-    padding: 12px 14px 20px 6px !important;
+    padding: 30px 14px 30px 6px !important;
+    touch-action: pan-y !important;
   }
   .trayPiece {
     height: auto !important;
     width: calc((100% - 16px) / 3) !important;
   }
+  /* Wide: arrows at the top and bottom of the tray column. */
+  .trayPrev,
+  .trayNext {
+    left: 0;
+    right: 8px;
+    width: auto;
+    height: 26px;
+    box-shadow: none;
+  }
+  .trayPrev {
+    top: 0;
+    bottom: auto;
+  }
+  .trayNext {
+    top: auto;
+    bottom: 0;
+  }
   .selectedHint {
     grid-column: 1;
+  }
+}
+/* Wide but short (a phone on its side): the clue card would squeeze the tray — use the small one in the toolbar. */
+@media (max-height: 560px) {
+  .refCard {
+    display: none !important;
+  }
+  .refMini {
+    display: block !important;
   }
 }
 
@@ -461,9 +660,12 @@
 .tray {
   display: flex;
   gap: 8px;
-  height: 92px;
-  padding: 8px 14px 10px;
+  height: 96px;
+  padding: 10px 32px 10px;
   overflow: auto hidden;
+  /* Swiping between pieces scrolls the strip; the pieces themselves only drag. */
+  touch-action: pan-x;
+  scroll-padding: 0 32px;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   background: color-mix(in srgb, var(--paper) 55%, transparent);
@@ -477,7 +679,8 @@
   border-radius: 10px;
   background: none;
   cursor: grab;
-  touch-action: inherit;
+  /* A touch on a piece is always a drag or a tap — the browser never turns it into a scroll. */
+  touch-action: none;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -526,19 +729,12 @@
   left: 0;
   top: 0;
   z-index: 30;
-  transform-origin: 0 0;
   pointer-events: none;
-  will-change: transform;
+  will-change: translate, scale;
 }
 .ghost svg {
   display: block;
   overflow: visible;
-  animation: lift 0.15s ease-out both;
-}
-@keyframes lift {
-  from {
-    transform: scale(0.92);
-  }
 }
 
 .sparkle {
