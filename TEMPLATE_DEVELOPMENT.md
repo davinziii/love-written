@@ -263,6 +263,8 @@ export const birthdaySurpriseDefinition = defineTemplate({
   category: "Birthday",
   schemaVersion: 1,
   listed: false, // keep hidden until it's ready (section 10)
+  priceCentavos: 9900, // ₱99 — what checkout charges (visitors in India see it in rupees)
+  collection: "photos", // the catalog shelf: "letters" | "photos" | "games"
   highlights: ["Tap-to-light candles", "A photo wall of the year", "A wish they unwrap"],
   fields: [
     // Look & Feel always comes first
@@ -389,7 +391,9 @@ Then run `npm run dev` and:
 
 ## 10. Publish it to the catalog
 
-Set `listed: true` in the definition and deploy. It appears on **Pick a Surprise** and on
+Add its catalog cover at `public/templates/<id>.webp` (480 × 600, a still of its opening screen),
+place it in `TEMPLATES` (src/templates/index.ts) where it belongs in price order, then set
+`listed: true` in the definition and deploy. It appears on **Pick a Surprise** and on
 the admin **Templates** page. Set it back to `false` to hide it from new customers —
 existing surprises keep working because the renderer stays registered.
 

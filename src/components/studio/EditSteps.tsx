@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { GenericEditor } from "@/components/editor/GenericEditor";
 import { Button } from "@/components/ui/Button";
 import { missingRequiredFields } from "@/templates/schema";
-import { formatPeso } from "@/lib/format";
+import { Price } from "@/components/ui/Price";
 import { validateScheduleTime } from "@/lib/lifecycle";
 import { api, ClientApiError, newIdempotencyKey } from "@/lib/client/api";
 import { trackClient } from "@/lib/client/analytics";
@@ -192,7 +192,7 @@ export function PreviewStep({ studio, onBack, cancelled }: { studio: Studio; onB
         <div className="rounded-[1.75rem] bg-paper p-6 ring-1 ring-line">
           <div className="flex items-baseline justify-between">
             <span className="text-ink-soft">Total</span>
-            <span className="font-display text-3xl">{formatPeso(state.priceCentavos)}</span>
+            <Price centavos={state.priceCentavos} className="font-display text-3xl" />
           </div>
           <p className="mt-2 text-sm text-ink-soft">
             GCash, Maya, QR Ph or card via PayMongo. You&rsquo;ll confirm publishing after payment — you can still edit until then.

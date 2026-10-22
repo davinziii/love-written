@@ -1,4 +1,6 @@
 import { requireAdmin } from "@/lib/admin/auth";
+import { listedTemplates } from "@/templates";
+import { PHP_TO_INR } from "@/lib/currency";
 import { storageStats } from "@/lib/admin/queries";
 import { Card, PageTitle, SectionTitle } from "@/components/admin/ui";
 import { Icon } from "@/components/ui/icons";
@@ -33,7 +35,14 @@ export default async function SettingsPage() {
       ok: PAYMENT_MODE !== "manual" || Boolean(ORDER_CONTACT.url),
       hint: "NEXT_PUBLIC_ORDER_URL and NEXT_PUBLIC_ORDER_LABEL",
     },
-    { label: "Price", value: formatPeso(e.PRICE_CENTAVOS), ok: true, hint: "PRICE_CENTAVOS" },
+    {
+      label: "Template prices",
+      value: listedTemplates()
+        .map((t) => `${t.name} ${formatPeso(t.priceCentavos)}`)
+        .join(" · "),
+      ok: true,
+      hint: `Set per template in its definition.ts. Visitors in India see rupees (₱1 = ₹${PHP_TO_INR}, NEXT_PUBLIC_PHP_TO_INR).`,
+    },
     {
       label: "PayMongo keys",
       value: e.PAYMONGO_SECRET_KEY && e.PAYMONGO_WEBHOOK_SECRET ? `Configured (${e.PAYMONGO_MODE} mode)` : "Not configured",

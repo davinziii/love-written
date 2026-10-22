@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/supabase/admin";
-import { env } from "@/lib/env";
 import { studioScreen } from "@/lib/lifecycle";
+import { templatePriceCentavos } from "@/lib/price";
 import type { SurpriseRow } from "@/lib/db-types";
 import type { StudioState } from "@/lib/studio-types";
 import { getMedia, latestOrder, latestPublishOperation, mediaUrlsByField, publicUrl } from "./repo";
@@ -47,6 +47,6 @@ export async function buildStudioState(
       : null,
     publishFailure: failedOp ? { operationId: failedOp.id, at: failedOp.finished_at ?? failedOp.started_at } : null,
     report,
-    priceCentavos: env().PRICE_CENTAVOS,
+    priceCentavos: templatePriceCentavos(row.template_id),
   };
 }

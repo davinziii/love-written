@@ -18,13 +18,13 @@ import { saveAccess } from "@/lib/security/access-vault";
 /**
  * Manual payment provider (launch workflow).
  *
- * The admin confirms a payment received outside the app (GCash, Maya, bank transfer),
+ * The admin confirms a payment received outside the app (GCash, Maya, bank transfer, PayPal),
  * then this creates the surprise + PAID order + payment record in one database
  * transaction and returns a private customization link for the customer.
  */
 
-export const MANUAL_PAYMENT_CHANNELS = ["gcash", "maya", "bank_transfer", "other"] as const;
-export type ManualPaymentChannel = (typeof MANUAL_PAYMENT_CHANNELS)[number];
+import { MANUAL_PAYMENT_CHANNELS, type ManualPaymentChannel } from "./channels";
+export { MANUAL_PAYMENT_CHANNELS, type ManualPaymentChannel };
 
 export interface ManualOrderInput {
   templateId: string;

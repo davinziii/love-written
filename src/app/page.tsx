@@ -13,7 +13,8 @@ import { SamplePreview } from "@/components/preview/SamplePreview";
 import { ourStoryDefinition } from "@/templates/our-story/definition";
 import { THEMES } from "@/templates/styles";
 import { formatPeso } from "@/lib/format";
-import { priceCentavos } from "@/lib/price";
+import { startingPriceCentavos } from "@/lib/price";
+import { Price } from "@/components/ui/Price";
 import { isManualPayments } from "@/lib/payments/mode";
 import { photoboothPriceCentavos } from "@/lib/photobooth/price";
 import { PhotoboothVisual } from "@/components/photobooth/PhotoboothVisual";
@@ -34,7 +35,7 @@ const FAN = [
 
 export default function LandingPage() {
   const sample = ourStoryDefinition.sample;
-  const price = formatPeso(priceCentavos());
+  const from = startingPriceCentavos();
   const boothPrice = formatPeso(photoboothPriceCentavos());
 
   return (
@@ -85,7 +86,7 @@ export default function LandingPage() {
                 className="animate-fade-up mt-5 text-sm text-ink-soft"
                 style={{ animationDelay: "1.5s" } as CSSProperties}
               >
-                <span className="font-medium text-ink">{price}</span> · introductory price · online for 30 days
+                From <Price centavos={from} className="font-medium text-ink" /> · online for 30 days
               </p>
             </div>
 
@@ -312,8 +313,11 @@ export default function LandingPage() {
                 <FloatingHearts />
               </PauseOffscreen>
               <div className="p-8 sm:p-12">
-                <Eyebrow icon={Icon.gift}>Introductory price</Eyebrow>
-                <p className="mt-6 font-display text-7xl tracking-tight">{price}</p>
+                <Eyebrow icon={Icon.gift}>Prices</Eyebrow>
+                <p className="mt-6 font-display text-7xl tracking-tight">
+                  <span className="mr-2 align-middle text-3xl text-ink-soft">from</span>
+                  <Price centavos={from} />
+                </p>
                 <p className="mt-2 text-ink-soft">One surprise · one payment · online for 30 days after it goes live</p>
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                   {isManualPayments ? <MessageToOrderCTA /> : <PickSurpriseCTA label="Start your surprise" />}
@@ -326,7 +330,7 @@ export default function LandingPage() {
                 {[
                   "Preview it on laptop and phone before it goes live",
                   "Publish now or schedule the reveal",
-                  isManualPayments ? "Pay with GCash, Maya or bank transfer" : "Pay with GCash, Maya, QR Ph or card",
+                  isManualPayments ? "Pay with GCash, Maya, bank transfer or PayPal" : "Pay with GCash, Maya, QR Ph or card",
                   "No account needed — a recovery code keeps it safe",
                   "Private link, never indexed by search engines",
                 ].map((item) => (

@@ -55,7 +55,7 @@ export async function startCheckout(row: SurpriseRow, idempotencyKey: string): P
     else throw Errors.conflict("CHECKOUT_PENDING", "We're preparing your payment page. Please try again in a moment.");
   }
 
-  const amount = env().PRICE_CENTAVOS; // never taken from the client
+  const amount = template.priceCentavos; // the template's own price — never taken from the client
   const { data: inserted, error } = await db()
     .from("orders")
     .insert({

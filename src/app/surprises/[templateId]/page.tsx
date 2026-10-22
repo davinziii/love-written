@@ -11,8 +11,7 @@ import { GradientBlobs } from "@/components/landing/Decor";
 import { Reveal } from "@/components/motion/Motion";
 import { HeartIcon, Icon } from "@/components/ui/icons";
 import { getTemplate, listedTemplates, type TemplateId } from "@/templates";
-import { formatPeso } from "@/lib/format";
-import { priceCentavos } from "@/lib/price";
+import { Price } from "@/components/ui/Price";
 import { isManualPayments } from "@/lib/payments/mode";
 
 type Props = { params: Promise<{ templateId: string }> };
@@ -28,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 const MANUAL_STEPS = [
   { icon: Icon.message, text: "Message us with this template's name" },
-  { icon: Icon.wallet, text: "Pay via GCash, Maya or bank transfer" },
+  { icon: Icon.wallet, text: "Pay via GCash, Maya, bank transfer or PayPal" },
   { icon: Icon.link, text: "Get your private link and create your surprise" },
 ];
 
@@ -78,8 +77,8 @@ export default async function TemplatePage({ params }: Props) {
                 </ul>
 
                 <div className="mt-8 flex items-baseline justify-between border-t border-line pt-6">
-                  <span className="text-sm text-ink-soft">One-time · introductory price</span>
-                  <span className="font-display text-4xl">{formatPeso(priceCentavos())}</span>
+                  <span className="text-sm text-ink-soft">One-time payment</span>
+                  <Price centavos={template.priceCentavos} className="font-display text-4xl" />
                 </div>
 
                 {isManualPayments ? (

@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/icons";
 import { photoboothPriceCentavos } from "@/lib/photobooth/price";
 
 const STEPS = [
-  { icon: Icon.wallet, text: "Confirm the payment in your GCash / Maya / bank app." },
+  { icon: Icon.wallet, text: "Confirm the payment in your GCash / Maya / bank / PayPal app." },
   { icon: Icon.image, text: "Create the photobooth here — it is marked as paid." },
   { icon: Icon.send, text: "DM the buyer their private link (Person A)." },
   { icon: Icon.link, text: "They check their camera — and for two people, send their person the invite link they see." },

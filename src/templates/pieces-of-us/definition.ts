@@ -97,6 +97,8 @@ export const piecesOfUsDefinition = defineTemplate({
   category: "Romance · Anniversary · Birthday · Just Because",
   schemaVersion: 1,
   listed: true,
+  priceCentavos: 14900,
+  collection: "games",
   displayField: "recipient_name",
   bulkPhotos: {
     label: "Add your puzzle photos at once",

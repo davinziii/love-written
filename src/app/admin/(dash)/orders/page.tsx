@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PAYMENT_CHANNEL_LABELS } from "@/lib/payments/channels";
 import { requireAdmin } from "@/lib/admin/auth";
 import { listOrders } from "@/lib/admin/queries";
 import { Badge, EmptyState, PageTitle, PrimaryLink, Table, fmt } from "@/components/admin/ui";
@@ -6,7 +7,7 @@ import { formatPeso } from "@/lib/format";
 import { getTemplate } from "@/templates";
 import { Icon } from "@/components/ui/icons";
 
-const CHANNEL: Record<string, string> = { gcash: "GCash", maya: "Maya", bank_transfer: "Bank", other: "Other" };
+const CHANNEL: Record<string, string> = PAYMENT_CHANNEL_LABELS;
 
 export default async function OrdersPage() {
   await requireAdmin();

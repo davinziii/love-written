@@ -11,7 +11,7 @@ export const HOW_IT_WORKS: Step[] = isManualPayments
   ? [
       { title: "Pick a surprise", body: "Browse our templates and choose the one that feels like the two of you.", icon: "layers" },
       { title: "Message us", body: "Send us a DM with the template you'd like. A real person answers.", icon: "message" },
-      { title: "Pay once", body: "GCash, Maya or bank transfer. We confirm it personally.", icon: "wallet" },
+      { title: "Pay once", body: "GCash, Maya, bank transfer or PayPal. We confirm it personally.", icon: "wallet" },
       { title: "Get your private link", body: "Your own page to create the surprise. No account, no app.", icon: "link" },
       { title: "Make it yours", body: "Add their name, your words and photos. Preview it on laptop and phone.", icon: "pen" },
       { title: "Reveal it", body: "Publish now, or schedule it for the exact moment you want.", icon: "send" },

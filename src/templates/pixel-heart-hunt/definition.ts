@@ -80,6 +80,8 @@ export const pixelHeartHuntDefinition = defineTemplate({
   category: "Romance · Anniversary · Birthday · Just Because",
   schemaVersion: 1,
   listed: true,
+  priceCentavos: 19900,
+  collection: "games",
   displayField: "recipient_name",
   bulkPhotos: {
     label: "Add all five photos at once",

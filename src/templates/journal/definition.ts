@@ -84,6 +84,8 @@ export const journalDefinition = defineTemplate({
   category: "Romance · Anniversary · Travel · Just Because",
   schemaVersion: 1,
   listed: true,
+  priceCentavos: 9900,
+  collection: "photos",
   displayField: "journal_title",
   bulkPhotos: {
     label: "Add all your page photos at once",

@@ -4,11 +4,10 @@ import { Card, PageTitle } from "@/components/admin/ui";
 import { ManualOrderForm } from "@/components/admin/ManualOrderForm";
 import { Icon } from "@/components/ui/icons";
 import { listedTemplates } from "@/templates";
-import { priceCentavos } from "@/lib/price";
 import { isManualPayments } from "@/lib/payments/mode";
 
 const STEPS = [
-  { icon: Icon.wallet, text: "Confirm the payment in your GCash / Maya / bank app." },
+  { icon: Icon.wallet, text: "Confirm the payment in your GCash / Maya / bank / PayPal app." },
   { icon: Icon.gift, text: "Create the surprise here — it is marked as paid." },
   { icon: Icon.send, text: "DM the customer their private link and recovery code." },
   { icon: Icon.pen, text: "They customize, then publish now or schedule it." },
@@ -31,8 +30,7 @@ export default async function NewManualOrderPage() {
       <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
         <Card tone="white">
           <ManualOrderForm
-            templates={listedTemplates().map((t) => ({ id: t.id, name: t.name }))}
-            defaultAmountPesos={priceCentavos() / 100}
+            templates={listedTemplates().map((t) => ({ id: t.id, name: t.name, pricePesos: t.priceCentavos / 100 }))}
             idempotencyKey={idempotencyKey}
           />
         </Card>

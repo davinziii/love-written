@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { MANUAL_PAYMENT_CHANNELS, PAYMENT_CHANNEL_LABELS, PAYMENT_REFERENCE_HINT, type ManualPaymentChannel } from "@/lib/payments/channels";
 import { createManualOrderAction, type IssueResult } from "@/app/admin/(dash)/actions";
 import { IssuedAccessCard } from "./IssuedAccessCard";
 
@@ -10,15 +11,16 @@ const field = "w-full rounded-2xl bg-soft px-4 py-3 text-sm outline-none ring-1 
 /** Record a manual payment and create the customer's surprise. */
 export function ManualOrderForm({
   templates,
-  defaultAmountPesos,
   idempotencyKey,
 }: {
-  templates: { id: string; name: string }[];
-  defaultAmountPesos: number;
+  templates: { id: string; name: string; pricePesos: number }[];
   idempotencyKey: string;
 }) {
   const [state, action, pending] = useActionState<IssueResult | null, FormData>(createManualOrderAction, null);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [channel, setChannel] = useState<ManualPaymentChannel>("gcash");
+  // The amount starts at the chosen template's price (still editable, e.g. for a discount).
+  const [amount, setAmount] = useState(String(templates[0]?.pricePesos ?? ""));
 
   if (state?.ok && state.access) {
     return (
@@ -41,8 +43,16 @@ export function ManualOrderForm({
         <div className="grid gap-2 sm:grid-cols-2">
           {templates.map((t, i) => (
             <label key={t.id} className="flex cursor-pointer items-center gap-3 rounded-2xl bg-soft px-4 py-3 text-sm ring-1 ring-transparent has-[:checked]:bg-petal has-[:checked]:ring-rose">
-              <input type="radio" name="templateId" value={t.id} defaultChecked={i === 0} className="accent-[var(--color-rose)]" />
-              {t.name}
+              <input
+                type="radio"
+                name="templateId"
+                value={t.id}
+                defaultChecked={i === 0}
+                onChange={() => setAmount(String(t.pricePesos))}
+                className="accent-[var(--color-rose)]"
+              />
+              <span className="flex-1">{t.name}</span>
+              <span className="text-ink-soft">₱{t.pricePesos}</span>
             </label>
           ))}
         </div>
@@ -51,20 +61,21 @@ export function ManualOrderForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block space-y-2 text-sm font-medium">
           Amount received (₱)
-          <input name="amountPesos" type="number" min="1" step="0.01" required defaultValue={defaultAmountPesos} className={field} />
+          <input name="amountPesos" type="number" min="1" step="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} className={field} />
         </label>
         <label className="block space-y-2 text-sm font-medium">
           Paid via
-          <select name="channel" required defaultValue="gcash" className={field}>
-            <option value="gcash">GCash</option>
-            <option value="maya">Maya</option>
-            <option value="bank_transfer">Bank transfer</option>
-            <option value="other">Other</option>
+          <select name="channel" required value={channel} onChange={(e) => setChannel(e.target.value as ManualPaymentChannel)} className={field}>
+            {MANUAL_PAYMENT_CHANNELS.map((c) => (
+              <option key={c} value={c}>
+                {PAYMENT_CHANNEL_LABELS[c]}
+              </option>
+            ))}
           </select>
         </label>
         <label className="block space-y-2 text-sm font-medium">
           Payment reference <span className="font-normal text-ink-soft">(optional)</span>
-          <input name="paymentReference" maxLength={120} placeholder="e.g. GCash ref no." className={field} />
+          <input name="paymentReference" maxLength={120} placeholder={PAYMENT_REFERENCE_HINT[channel]} className={field} />
         </label>
         <label className="block space-y-2 text-sm font-medium">
           Customer <span className="font-normal text-ink-soft">(optional)</span>
@@ -87,7 +98,7 @@ export function ManualOrderForm({
           onChange={(e) => setPaymentConfirmed(e.target.checked)}
           className="mt-0.5 accent-[var(--color-rose)]"
         />
-        <span>I have checked my GCash / Maya / bank app and the payment was received.</span>
+        <span>I have checked my GCash / Maya / bank / PayPal app and the payment was received.</span>
       </label>
 
       <Button

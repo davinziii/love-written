@@ -1,7 +1,16 @@
-import "server-only";
+import { getTemplate, listedTemplates } from "@/templates";
 
-/** The single price (centavos). ₱99 introductory = 9900. Charged amount is always read here on the server. */
-export function priceCentavos(): number {
-  const n = Number(process.env.PRICE_CENTAVOS ?? 9900);
-  return Number.isInteger(n) && n > 0 ? n : 9900;
+/**
+ * Template prices (centavos). Each template sets its own price in its definition; the amount
+ * charged at checkout is always read here on the server, never from the browser.
+ */
+export function templatePriceCentavos(templateId: string): number {
+  const t = getTemplate(templateId);
+  if (!t) throw new Error(`Unknown template "${templateId}"`);
+  return t.priceCentavos;
+}
+
+/** The cheapest listed template ("from ₱99"). */
+export function startingPriceCentavos(): number {
+  return Math.min(...listedTemplates().map((t) => t.priceCentavos));
 }

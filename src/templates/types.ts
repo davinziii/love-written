@@ -96,6 +96,14 @@ export type FieldDef =
   | MusicField
   | ChoiceField;
 
+export type TemplateCollection = "letters" | "photos" | "games";
+
+export const COLLECTIONS: readonly { id: TemplateCollection; label: string }[] = [
+  { id: "letters", label: "Love letters" },
+  { id: "photos", label: "Photo albums" },
+  { id: "games", label: "Games" },
+];
+
 export interface TemplateDefinition<F extends readonly FieldDef[] = readonly FieldDef[]> {
   /** URL-safe id; also the renderer registry key. */
   id: string;
@@ -109,6 +117,10 @@ export interface TemplateDefinition<F extends readonly FieldDef[] = readonly Fie
   schemaVersion: number;
   /** Show in the public "Pick a Surprise" catalog. */
   listed: boolean;
+  /** Price in centavos (₱99 = 9900). The amount actually charged is always read from here on the server. */
+  priceCentavos: number;
+  /** Which shelf of the catalog it sits on (the filter chips on /surprises). */
+  collection: TemplateCollection;
   /** Optional text field used to name a surprise in lists (e.g. the recipient's name). */
   displayField?: string;
   /** What the customer gets — shown on the template page. */

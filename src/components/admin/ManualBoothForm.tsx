@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { MANUAL_PAYMENT_CHANNELS, PAYMENT_CHANNEL_LABELS, PAYMENT_REFERENCE_HINT, type ManualPaymentChannel } from "@/lib/payments/channels";
 import { createManualBoothAction, type BoothIssueResult } from "@/app/admin/(dash)/photobooth/actions";
 import { BoothLinksCard } from "./BoothLinksCard";
 
@@ -11,6 +12,7 @@ const field = "w-full rounded-2xl bg-soft px-4 py-3 text-sm outline-none ring-1 
 export function ManualBoothForm({ defaultAmountPesos, idempotencyKey }: { defaultAmountPesos: number; idempotencyKey: string }) {
   const [state, action, pending] = useActionState<BoothIssueResult | null, FormData>(createManualBoothAction, null);
   const [paid, setPaid] = useState(false);
+  const [channel, setChannel] = useState<ManualPaymentChannel>("gcash");
 
   if (state?.ok && state.booth) {
     return (
@@ -54,16 +56,17 @@ export function ManualBoothForm({ defaultAmountPesos, idempotencyKey }: { defaul
         </label>
         <label className="block space-y-2 text-sm font-medium">
           Paid via
-          <select name="channel" required defaultValue="gcash" className={field}>
-            <option value="gcash">GCash</option>
-            <option value="maya">Maya</option>
-            <option value="bank_transfer">Bank transfer</option>
-            <option value="other">Other</option>
+          <select name="channel" required value={channel} onChange={(e) => setChannel(e.target.value as ManualPaymentChannel)} className={field}>
+            {MANUAL_PAYMENT_CHANNELS.map((c) => (
+              <option key={c} value={c}>
+                {PAYMENT_CHANNEL_LABELS[c]}
+              </option>
+            ))}
           </select>
         </label>
         <label className="block space-y-2 text-sm font-medium">
           Payment reference <span className="font-normal text-ink-soft">(optional)</span>
-          <input name="paymentReference" maxLength={120} placeholder="e.g. GCash ref no." className={field} />
+          <input name="paymentReference" maxLength={120} placeholder={PAYMENT_REFERENCE_HINT[channel]} className={field} />
         </label>
         <label className="block space-y-2 text-sm font-medium">
           Customer <span className="font-normal text-ink-soft">(optional)</span>
@@ -76,7 +79,7 @@ export function ManualBoothForm({ defaultAmountPesos, idempotencyKey }: { defaul
       </label>
       <label className="flex items-start gap-3 rounded-2xl bg-[#fff4e0] px-4 py-3 text-sm">
         <input type="checkbox" name="confirmPaid" value="yes" required checked={paid} onChange={(e) => setPaid(e.target.checked)} className="mt-0.5 accent-rose" />
-        <span>I have checked my GCash / Maya / bank app and the payment was received.</span>
+        <span>I have checked my GCash / Maya / bank / PayPal app and the payment was received.</span>
       </label>
       <Button type="submit" busy={pending} busyLabel="Creating…" disabled={!paid} className="w-full sm:w-auto">
         Create photobooth &amp; private links

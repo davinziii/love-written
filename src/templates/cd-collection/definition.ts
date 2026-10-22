@@ -59,6 +59,8 @@ export const cdCollectionDefinition = defineTemplate({
   category: "Romance · Anniversary · Birthday · Just Because",
   schemaVersion: 1,
   listed: true,
+  priceCentavos: 9900,
+  collection: "photos",
   displayField: "collection_title",
   bulkPhotos: {
     label: "Add all your CD covers at once",

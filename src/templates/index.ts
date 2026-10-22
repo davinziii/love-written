@@ -16,14 +16,15 @@ import { cdCollectionDefinition } from "./cd-collection/definition";
 import { pixelHeartHuntDefinition } from "./pixel-heart-hunt/definition";
 import { piecesOfUsDefinition } from "./pieces-of-us/definition";
 
+// Catalog order: cheapest first, as they appear on "Pick a Surprise".
 export const TEMPLATES = {
   "our-story": ourStoryDefinition,
   "letter-for-you": letterForYouDefinition,
-  loveflix: loveflixDefinition,
-  journal: journalDefinition,
   "cd-collection": cdCollectionDefinition,
-  "pixel-heart-hunt": pixelHeartHuntDefinition,
+  journal: journalDefinition,
   "pieces-of-us": piecesOfUsDefinition,
+  loveflix: loveflixDefinition,
+  "pixel-heart-hunt": pixelHeartHuntDefinition,
 } as const satisfies Record<string, TemplateDefinition>;
 
 export type TemplateId = keyof typeof TEMPLATES;

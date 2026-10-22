@@ -44,6 +44,8 @@ export const loveflixDefinition = defineTemplate({
   category: "Romance · Anniversary · Just Because",
   schemaVersion: 1,
   listed: true,
+  priceCentavos: 19900,
+  collection: "photos",
   displayField: "show_title",
   highlights: [
     "A cinematic logo intro with your own logo text",

@@ -17,6 +17,8 @@ export const ourStoryDefinition = defineTemplate({
   category: "Romance · Anniversary · Just Because",
   schemaVersion: 2,
   listed: true,
+  priceCentavos: 9900,
+  collection: "letters",
   displayField: "recipient_name",
   highlights: [
     "Opens like a sealed letter",

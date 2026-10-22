@@ -106,7 +106,7 @@ const FAQS: { q: string; a: React.ReactNode }[] = [
   {
     q: "How can I pay?",
     a: isManualPayments
-      ? "For now, send us a message and pay with GCash, Maya or bank transfer. We confirm your payment personally and send you your private link."
+      ? "For now, send us a message and pay with GCash, Maya, bank transfer or PayPal (handy if you're outside the Philippines). We confirm your payment personally and send you your private link."
       : "Through PayMongo — GCash, Maya, QR Ph, or card, depending on availability.",
   },
   {

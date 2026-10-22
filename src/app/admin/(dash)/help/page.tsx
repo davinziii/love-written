@@ -8,7 +8,7 @@ const GUIDES = [
     icon: Icon.wallet,
     title: "A customer paid",
     steps: [
-      "Check the payment in your GCash / Maya / bank app.",
+      "Check the payment in your GCash / Maya / bank / PayPal app.",
       "Go to Create Surprise, pick the template, enter the amount and reference.",
       "Copy the ready-made message and send it in the customer's DM.",
     ],
